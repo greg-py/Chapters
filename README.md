@@ -11,6 +11,8 @@ Chapters is a comprehensive Slack bot designed to streamline book club managemen
 - **Book Club Status**: Check the current status and phase of the book club
 - **Cycle History**: View past book club cycles with statistics and winning books
 - **Anonymous Suggestions**: Book suggestions are displayed anonymously to prevent bias in voting
+- **Automated Phase Transitions**: Phases transition automatically with informative messages at each stage
+- **Phase-Specific Messages**: Each phase includes helpful context like available books during voting, the selected book during reading, and discussion prompts
 
 ## Getting Started
 
@@ -112,7 +114,27 @@ Completes the current book club cycle, archives it, and allows a new cycle to be
 9. **Complete Cycle**: End the cycle with `/chapters-complete-cycle`
 10. **Check Status**: Monitor the current phase and deadlines with `/chapters-cycle-status`
 
+## Phase Transition Messages
+
+When the book club transitions between phases (either automatically or manually), the bot sends informative messages:
+
+- **Voting Phase**: Lists all suggested books available for voting
+- **Reading Phase**: Showcases the winning book with details including title, author, link, and notes
+- **Discussion Phase**: Provides congratulatory messages and discussion prompts related to the selected book
+
+These messages help guide members through each phase of the book club with relevant context and instructions.
+
 ## Development
+
+### Test Mode for Rapid Phase Transitions
+
+When testing the phase transition service, it's helpful to use shorter durations than the default days-long phases. The application includes a test mode that sets all phase durations to 1 minute for rapid testing:
+
+1. Add `TEST_MODE=true` to your `.env` file
+2. Restart the application
+3. When enabled, you'll see a console message: `🧪 TEST MODE ENABLED: All phase durations set to 1 minute`
+
+This allows you to test the full cycle of phase transitions in just a few minutes instead of days or weeks, without modifying any production code.
 
 ### Error Handling Pattern
 

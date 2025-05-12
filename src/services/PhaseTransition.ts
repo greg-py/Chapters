@@ -30,7 +30,16 @@ export class PhaseTransitionService {
 
   constructor(app: App, checkIntervalMinutes: number = 60) {
     this.client = app.client;
-    this.checkIntervalMs = checkIntervalMinutes * 60 * 1000;
+
+    // Use a much shorter check interval if in test mode (every 10 seconds)
+    if (process.env.TEST_MODE === "true") {
+      this.checkIntervalMs = 10 * 1000; // 10 seconds in test mode
+      console.log(
+        "🧪 TEST MODE: Phase transition checks running every 10 seconds"
+      );
+    } else {
+      this.checkIntervalMs = checkIntervalMinutes * 60 * 1000;
+    }
   }
 
   /**
@@ -165,9 +174,17 @@ export class PhaseTransitionService {
       attempts: 0,
     });
 
-    console.log(
-      `Set phase end time for cycle ${cycle.getId()}, phase ${currentPhase}: ${endTime}`
-    );
+    // In test mode, show the end time in a more readable format
+    if (process.env.TEST_MODE === "true") {
+      const seconds = Math.round((endTime.getTime() - now.getTime()) / 1000);
+      console.log(
+        `🧪 TEST MODE: Set phase end time for cycle ${cycle.getId()}, phase ${currentPhase}: ${endTime} (in ${seconds} seconds)`
+      );
+    } else {
+      console.log(
+        `Set phase end time for cycle ${cycle.getId()}, phase ${currentPhase}: ${endTime}`
+      );
+    }
   }
 
   /**
@@ -236,6 +253,13 @@ export class PhaseTransitionService {
         return;
       }
 
+      // Special handling for discussion phase ending - complete the cycle
+      if (currentPhase === CyclePhase.DISCUSSION) {
+        await this.completeCycle(cycle);
+        return;
+      }
+
+      // For all other phases, continue with normal transition logic
       // Get the next phase
       const nextPhase = this.getNextPhase(currentPhase);
 
@@ -411,24 +435,104 @@ export class PhaseTransitionService {
       announcementMsg += `\n\nThis is a reset back to the suggestion phase. Any previously selected book has been cleared and all votes have been reset, but existing suggestions remain. Members can now suggest additional books using \`/chapters-suggest-book\`.`;
     }
 
-    // If transitioning to reading or discussion phase, include book info
-    if (
-      nextPhase === CyclePhase.READING ||
-      nextPhase === CyclePhase.DISCUSSION
-    ) {
+    // If transitioning to VOTING phase, include all suggested books
+    if (nextPhase === CyclePhase.VOTING) {
+      const suggestions = await Suggestion.getAllForCycle(cycle.getId());
+
+      if (suggestions.length > 0) {
+        announcementMsg += `\n\n:ballot_box_with_ballot: *Books Available for Voting:*\n`;
+
+        // Add each book to the message with formatting
+        suggestions.forEach((suggestion, index) => {
+          announcementMsg += `\n${
+            index + 1
+          }. *"${suggestion.getBookName()}"* by *${suggestion.getAuthor()}*`;
+        });
+
+        announcementMsg += `\n\nUse \`/chapters-vote\` to cast your vote for these books!`;
+      } else {
+        announcementMsg += `\n\nNo books have been suggested for this cycle. This is unusual - please use \`/chapters-suggest-book\` to add suggestions.`;
+      }
+    }
+
+    // If transitioning to READING phase, show the winning book with nice formatting
+    if (nextPhase === CyclePhase.READING) {
+      // First, make sure we have a selected book
+      let selectedBookId = cycle.getSelectedBookId();
+
+      // If no book is selected yet, try to auto-select a winner
+      if (!selectedBookId) {
+        const success = await this.autoSelectWinner(cycle);
+        if (success) {
+          // Get the updated cycle with the newly selected book
+          const db = await connectToDatabase();
+          const updatedCycleData = await db
+            .collection("cycles")
+            .findOne({ id: cycle.getId() });
+
+          if (updatedCycleData && updatedCycleData.selectedBookId) {
+            selectedBookId = updatedCycleData.selectedBookId;
+          }
+        }
+      }
+
+      // Now process the message with the book info if we have it
+      if (selectedBookId) {
+        const selectedBook = await Suggestion.getById(selectedBookId);
+        if (selectedBook) {
+          // Enhanced formatted message for the winning book
+          announcementMsg += `\n\n:trophy: *Selected Book* :trophy:\n\n`;
+          announcementMsg += `> :book: *"${selectedBook.getBookName()}"*\n`;
+          announcementMsg += `> :writing_hand: by *${selectedBook.getAuthor()}*\n`;
+
+          // Add link if available
+          const bookLink = selectedBook.getLink();
+          if (bookLink) {
+            announcementMsg += `> :link: <${bookLink}|View Book Details>\n`;
+          }
+
+          // Add notes if available
+          const bookNotes = selectedBook.getNotes();
+          if (bookNotes) {
+            announcementMsg += `> :memo: ${bookNotes}\n`;
+          }
+
+          announcementMsg += `\n*Happy Reading!* :sparkles:`;
+        }
+      } else {
+        announcementMsg += `\n\nNo book was selected for this cycle. This is unusual - please manually select a book using the book club management commands.`;
+      }
+    }
+
+    // If transitioning to DISCUSSION phase, add congratulations and instructions
+    if (nextPhase === CyclePhase.DISCUSSION) {
       const selectedBookId = cycle.getSelectedBookId();
       if (selectedBookId) {
         const selectedBook = await Suggestion.getById(selectedBookId);
         if (selectedBook) {
-          announcementMsg += `\n\nThe book selected for this cycle is *"${selectedBook.getBookName()}"* by *${selectedBook.getAuthor()}*.`;
+          announcementMsg += `\n\n:tada: *Congratulations on finishing "${selectedBook.getBookName()}"!* :tada:\n\n`;
+          announcementMsg += `It's time to discuss what you thought about the book! Please use the *Discussion* channel to share your questions, thoughts, and opinions about "${selectedBook.getBookName()}" by ${selectedBook.getAuthor()}.`;
+          announcementMsg += `\n\nSome discussion prompts to get started:\n• What did you like most about the book?\n• Were there any characters or moments that particularly stood out to you?\n• Would you recommend this book to others?`;
+        } else {
+          announcementMsg += `\n\n:tada: *Congratulations on finishing your book!* :tada:\n\n`;
+          announcementMsg += `It's time to discuss what you thought about it! Please use the *Discussion* channel to share your questions, thoughts, and opinions about this cycle's book.`;
         }
+      } else {
+        announcementMsg += `\n\n:tada: *Congratulations on finishing your book!* :tada:\n\n`;
+        announcementMsg += `It's time to discuss what you thought about it! Please use the *Discussion* channel to share your questions, thoughts, and opinions about this cycle's book.`;
       }
     }
 
     // Get phase duration for the announcement
     const phaseDurations = cycle.getPhaseDurations();
     const duration = phaseDurations[nextPhase as keyof typeof phaseDurations];
-    announcementMsg += `\n\nThis phase will end in ${duration} days.`;
+
+    // Show "1 minute" in test mode instead of fractional days
+    if (process.env.TEST_MODE === "true") {
+      announcementMsg += `\n\nThis phase will end in 1 minute.`;
+    } else {
+      announcementMsg += `\n\nThis phase will end in ${duration} days.`;
+    }
 
     // Update the cycle
     const updatedCycle = await cycle.update(updateData);
@@ -453,10 +557,13 @@ export class PhaseTransitionService {
   private extendPhaseEndTime(cycleId: string, phaseInfo: PhaseEndTime): void {
     const currentAttempts = phaseInfo.attempts + 1;
 
-    // Extend by one day
-    const newEndTime = new Date(
-      phaseInfo.endTime.getTime() + 24 * 60 * 60 * 1000
-    );
+    // Extend by one minute in test mode, otherwise one day
+    const extensionMs =
+      process.env.TEST_MODE === "true"
+        ? 60 * 1000 // 1 minute in test mode
+        : 24 * 60 * 60 * 1000; // 1 day in normal mode
+
+    const newEndTime = new Date(phaseInfo.endTime.getTime() + extensionMs);
 
     this.phaseEndTimes.set(cycleId, {
       ...phaseInfo,
@@ -474,8 +581,10 @@ export class PhaseTransitionService {
       }
     );
 
+    // Log with appropriate time unit
+    const extensionUnit = process.env.TEST_MODE === "true" ? "minute" : "day";
     console.log(
-      `Extended phase end time for cycle ${cycleId} to ${newEndTime}`
+      `Extended phase end time for cycle ${cycleId} to ${newEndTime} (by 1 ${extensionUnit})`
     );
   }
 
@@ -487,8 +596,9 @@ export class PhaseTransitionService {
     newEndTime: Date,
     attempts: number
   ): Promise<void> {
-    // Don't send notifications too frequently - maybe only on 1st, 3rd, 7th day, etc.
+    // In test mode, notify on every attempt. In normal mode, only on 1st, 3rd, 7th day, etc.
     if (
+      process.env.TEST_MODE !== "true" &&
       attempts !== 1 &&
       attempts !== 3 &&
       attempts !== 7 &&
@@ -518,9 +628,11 @@ export class PhaseTransitionService {
         cycleData.selectedBookId
       );
 
+      const extensionUnit = process.env.TEST_MODE === "true" ? "minute" : "day";
+
       let message = `:clock1: *Book Club Phase Change Delayed*\n\nThe ${capitalizeFirstLetter(
         phaseInfo.phase
-      )} phase for cycle "${cycle.getName()}" has been extended by another day.`;
+      )} phase for cycle "${cycle.getName()}" has been extended by another ${extensionUnit}.`;
 
       // Explain why based on current phase
       if (phaseInfo.phase === CyclePhase.SUGGESTION) {
@@ -529,7 +641,14 @@ export class PhaseTransitionService {
         message += `\n\nReason: More votes are needed to select a book. Use \`/chapters-vote\` to cast your vote.`;
       }
 
-      message += `\n\nThe phase will now end on ${newEndTime.toLocaleDateString()} if requirements are met.`;
+      message += `\n\nThe phase will now end on ${newEndTime.toLocaleDateString()}`;
+
+      // Add more precise time in test mode
+      if (process.env.TEST_MODE === "true") {
+        message += ` at ${newEndTime.toLocaleTimeString()}`;
+      }
+
+      message += ` if requirements are met.`;
 
       await this.client.chat.postMessage({
         channel: phaseInfo.channelId,
@@ -554,7 +673,9 @@ export class PhaseTransitionService {
       case CyclePhase.READING:
         return CyclePhase.DISCUSSION;
       case CyclePhase.DISCUSSION:
-        return CyclePhase.SUGGESTION; // Loop back to suggestion for a new cycle
+        // For discussion phase, we'll handle completion differently
+        // but still need to return a value for other functions
+        return CyclePhase.SUGGESTION;
       default:
         return CyclePhase.SUGGESTION;
     }
@@ -608,5 +729,32 @@ export class PhaseTransitionService {
    */
   public async triggerCheck(): Promise<void> {
     await this.checkPhaseTransitions();
+  }
+
+  /**
+   * Complete a cycle at the end of the discussion phase
+   */
+  private async completeCycle(cycle: Cycle): Promise<void> {
+    try {
+      const channelId = cycle.getChannelId();
+
+      // Update cycle status to completed
+      await cycle.update({ status: "completed" });
+
+      // Post announcement in the channel
+      await this.client.chat.postMessage({
+        channel: channelId,
+        text: `:tada: *Book Club Cycle Completed!*\n\nThe book club cycle "${cycle.getName()}" has been completed and archived.\n\nTo start a new book club cycle, use the \`/chapters-start-cycle\` command.`,
+      });
+
+      // Remove the cycle from tracking
+      this.onCycleCompleted(channelId);
+
+      console.log(
+        `Cycle ${cycle.getId()} automatically completed after discussion phase`
+      );
+    } catch (error) {
+      console.error(`Error completing cycle: ${error}`);
+    }
   }
 }

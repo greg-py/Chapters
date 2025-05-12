@@ -6,7 +6,7 @@ import {
   updateCycle,
   getSuggestionsByCycle,
 } from "../dto";
-import { DEFAULT_PHASE_DURATIONS } from "../config";
+import { getPhaseConfig } from "../config";
 import type {
   TCycleStatus,
   TCycleStats,
@@ -64,7 +64,7 @@ export class Cycle {
         totalVotes: 0,
         participantCount: 0,
       },
-      phaseDurations: DEFAULT_PHASE_DURATIONS,
+      phaseDurations: getPhaseConfig(),
     };
 
     // Initialize the cycle in the database
@@ -237,10 +237,10 @@ export class Cycle {
     const phase = this.currentPhase;
 
     // Add null check and fallback to default durations
-    const phaseDurations = this.phaseDurations || DEFAULT_PHASE_DURATIONS;
+    const phaseDurations = this.phaseDurations || getPhaseConfig();
     const duration =
       phaseDurations[phase as keyof TPhaseDurations] ||
-      DEFAULT_PHASE_DURATIONS[phase as keyof typeof DEFAULT_PHASE_DURATIONS] ||
+      getPhaseConfig()[phase as keyof ReturnType<typeof getPhaseConfig>] ||
       7; // Default to 7 days if all else fails
 
     // Convert days to milliseconds (days * 24 hours * 60 minutes * 60 seconds * 1000 milliseconds)

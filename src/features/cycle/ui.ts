@@ -1,8 +1,9 @@
 import type { App, SlashCommand } from "@slack/bolt";
 import type { Cycle } from "../../services";
+import { Suggestion } from "../../services";
 import { capitalizeFirstLetter, formatDate } from "../../utils";
 import { ActionId, BlockId, CyclePhase } from "../../constants";
-import { DEFAULT_PHASE_DURATIONS } from "../../config";
+import { getPhaseConfig } from "../../config";
 
 /**
  * Sends the cycle configuration UI to the user
@@ -74,7 +75,10 @@ export const sendCycleConfigurationUI = async (
         element: {
           type: "plain_text_input",
           action_id: ActionId.SUGGESTION_DAYS_INPUT,
-          initial_value: DEFAULT_PHASE_DURATIONS.suggestion.toString(),
+          initial_value:
+            process.env.TEST_MODE === "true"
+              ? "1 min"
+              : getPhaseConfig().suggestion.toString(),
           placeholder: { type: "plain_text", text: "Days" },
         },
         label: { type: "plain_text", text: "Suggestion Phase Duration" },
@@ -85,7 +89,10 @@ export const sendCycleConfigurationUI = async (
         element: {
           type: "plain_text_input",
           action_id: ActionId.VOTING_DAYS_INPUT,
-          initial_value: DEFAULT_PHASE_DURATIONS.voting.toString(),
+          initial_value:
+            process.env.TEST_MODE === "true"
+              ? "1 min"
+              : getPhaseConfig().voting.toString(),
           placeholder: { type: "plain_text", text: "Days" },
         },
         label: { type: "plain_text", text: "Voting Phase Duration" },
@@ -96,7 +103,10 @@ export const sendCycleConfigurationUI = async (
         element: {
           type: "plain_text_input",
           action_id: ActionId.READING_DAYS_INPUT,
-          initial_value: DEFAULT_PHASE_DURATIONS.reading.toString(),
+          initial_value:
+            process.env.TEST_MODE === "true"
+              ? "1 min"
+              : getPhaseConfig().reading.toString(),
           placeholder: { type: "plain_text", text: "Days" },
         },
         label: { type: "plain_text", text: "Reading Phase Duration" },
@@ -107,7 +117,10 @@ export const sendCycleConfigurationUI = async (
         element: {
           type: "plain_text_input",
           action_id: ActionId.DISCUSSION_DAYS_INPUT,
-          initial_value: DEFAULT_PHASE_DURATIONS.discussion.toString(),
+          initial_value:
+            process.env.TEST_MODE === "true"
+              ? "1 min"
+              : getPhaseConfig().discussion.toString(),
           placeholder: { type: "plain_text", text: "Days" },
         },
         label: { type: "plain_text", text: "Discussion Phase Duration" },
@@ -128,6 +141,7 @@ export const sendCycleConfigurationUI = async (
         ],
       },
     ],
+    text: "Book Club Configuration Form",
   });
 };
 
@@ -165,72 +179,103 @@ export const sendCycleStatusMessage = async (
       phaseEmoji = "📝";
   }
 
+  // Build blocks array
+  const blocks: any = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: "📚 Book Club Cycle Status",
+        emoji: true,
+      },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Cycle Name:* ${cycle.getName()}`,
+      },
+    },
+    {
+      type: "divider",
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `${phaseEmoji} *Current Phase:* ${capitalizeFirstLetter(
+          currentPhase
+        )}`,
+      },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `⏱️ *Phase Deadline:* ${
+          deadline ? formatDate(deadline) : "Not set"
+        }`,
+      },
+    },
+  ];
+
+  // Add selected book info if available
+  const selectedBookId = cycle.getSelectedBookId();
+  if (selectedBookId) {
+    const selectedBook = await Suggestion.getById(selectedBookId);
+    if (selectedBook) {
+      blocks.push({
+        type: "divider",
+      });
+
+      // Create link to the book if URL is available
+      const bookLink = selectedBook.getLink()
+        ? `<${selectedBook.getLink()}|${selectedBook.getBookName()}>`
+        : selectedBook.getBookName();
+
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `📖 *Current Book:* ${bookLink} by ${selectedBook.getAuthor()}`,
+        },
+      });
+    }
+  }
+
+  blocks.push(
+    {
+      type: "divider",
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `📚 *Book Suggestions:* ${stats.totalSuggestions}`,
+        },
+        {
+          type: "mrkdwn",
+          text: `📊 *Votes Cast:* ${stats.totalVotes}`,
+        },
+      ] as any, // Type assertion to avoid TypeScript error with fields property
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `Use \`/chapters-set-phase\` to manually change the current phase.`,
+        },
+      ],
+    }
+  );
+
   await client.chat.postEphemeral({
     channel: command.channel_id,
     user: command.user_id,
-    blocks: [
-      {
-        type: "header",
-        text: {
-          type: "plain_text",
-          text: "📚 Book Club Cycle Status",
-          emoji: true,
-        },
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*Cycle Name:* ${cycle.getName()}`,
-        },
-      },
-      {
-        type: "divider",
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `${phaseEmoji} *Current Phase:* ${capitalizeFirstLetter(
-            currentPhase
-          )}`,
-        },
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `⏱️ *Phase Deadline:* ${
-            deadline ? formatDate(deadline) : "Not set"
-          }`,
-        },
-      },
-      {
-        type: "divider",
-      },
-      {
-        type: "section",
-        fields: [
-          {
-            type: "mrkdwn",
-            text: `📚 *Book Suggestions:* ${stats.totalSuggestions}`,
-          },
-          {
-            type: "mrkdwn",
-            text: `📊 *Votes Cast:* ${stats.totalVotes}`,
-          },
-        ],
-      },
-      {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: `Use \`/chapters-set-phase\` to manually change the current phase.`,
-          },
-        ],
-      },
-    ],
+    blocks,
+    text: "Book Club Cycle Status",
   });
 };
 
@@ -353,5 +398,6 @@ export const sendCyclePhaseSelectionUI = async (
         ],
       },
     ],
+    text: "Change Book Club Phase Form",
   });
 };

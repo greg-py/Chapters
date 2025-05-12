@@ -152,6 +152,7 @@ export const sendVoteUI = async (
         ],
       },
     ],
+    text: "Vote for Books Form",
   });
 };
 
@@ -238,6 +239,7 @@ export const sendVotingResultsUI = async (
   await client.chat.postMessage({
     channel: command.channel_id,
     blocks,
+    text: "Voting Results for Book Club Cycle",
   });
 };
 

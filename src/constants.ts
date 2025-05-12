@@ -14,6 +14,8 @@ export const ActionId = {
   CONFIRM_PHASE_CHANGE: "confirm_phase_change",
   CANCEL_PHASE_CHANGE: "cancel_phase_change",
   SELECT_BOOK_AND_CHANGE_PHASE: "select_book_and_change_phase",
+  CONFIRM_CYCLE_RESET: "confirm_cycle_reset",
+  CANCEL_CYCLE_RESET: "cancel_cycle_reset",
 
   // Suggestion Actions
   SUBMIT_BOOK_SUGGESTION: "submit_book_suggestion",

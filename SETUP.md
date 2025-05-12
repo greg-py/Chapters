@@ -15,6 +15,10 @@ MONGODB_URI=mongodb://localhost:27017/chapters
 
 # App settings
 PORT=3000
+
+# Testing settings
+# Set to 'true' to use 1-minute phase durations for testing and 10-second checks
+# TEST_MODE=true
 ```
 
 ## How to Get the Tokens
@@ -76,8 +80,28 @@ Ensure your Slack app has the following:
 Once configured:
 
 1. Install dependencies: `npm install`
-2. Run in development: `npm run dev`
-3. For production: `npm run build` then `npm start`
+2. Start MongoDB locally: `npm run db:start` (requires Docker)
+3. Run in development: `npm run dev`
+4. For production: `npm run build` then `npm start`
+
+## Testing Phase Transitions
+
+The app includes a test mode for rapid phase transitions:
+
+1. Set `TEST_MODE=true` in your `.env` file
+2. When enabled:
+   - All phase durations are set to 1 minute (instead of days)
+   - Phase transition checks run every 10 seconds (instead of hourly)
+   - Console will display: `🧪 TEST MODE: Phase transition checks running every 10 seconds`
+3. This allows you to test the full lifecycle of a book club cycle in minutes
+
+## Phase Transition Messages
+
+When the app transitions between phases, it sends informative messages with phase-specific context:
+
+- **Voting Phase**: Displays a list of all suggested books available for voting
+- **Reading Phase**: Shows the selected book with details including title, author, and link
+- **Discussion Phase**: Includes congratulatory messages and discussion prompts
 
 ## Deploying to Production
 

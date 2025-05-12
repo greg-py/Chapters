@@ -1,13 +1,11 @@
-import type { App, BlockAction, SlashCommand } from "@slack/bolt";
-import { Cycle, Suggestion, Vote } from "../../services";
+import type { App, BlockAction } from "@slack/bolt";
+import { Suggestion, Vote } from "../../services";
 import { capitalizeFirstLetter, withActionErrorHandling } from "../../utils";
 import { ActionId, BlockId, CyclePhase } from "../../constants";
-import {
-  validateActiveCycleExists,
-  validateNoActiveCycleExists,
-} from "../../validators";
+import { validateActiveCycleExists } from "../../validators";
 import { ObjectId } from "mongodb";
 import { phaseTransitionService } from "../../index";
+import { connectToDatabase } from "../../db";
 
 /**
  * Registers all cycle actions
@@ -65,6 +63,43 @@ export const registerCycleActions = (app: App): void => {
         throw new Error("Cycle Name is required. Please enter a valid name.");
       }
 
+      // Check if we're in test mode
+      const isTestMode = process.env.TEST_MODE === "true";
+
+      // If in test mode, we'll use the getPhaseConfig() function directly instead of form values
+      if (isTestMode) {
+        // Update the cycle with test mode durations
+        const { getPhaseConfig } = await import("../../config");
+        const testPhaseDurations = getPhaseConfig();
+
+        const updatedCycle = await cycle.update({
+          name: cycleName,
+          phaseDurations: testPhaseDurations,
+          currentPhase: CyclePhase.SUGGESTION, // Start in suggestion phase after config
+        });
+
+        // Notify the phase transition service about the updated cycle
+        phaseTransitionService.onCycleUpdated(updatedCycle);
+
+        // Post confirmation message to user with test mode warning
+        await client.chat.postEphemeral({
+          channel: channelId,
+          user: userId,
+          text: `✅ Book club cycle "${updatedCycle.getName()}" configured successfully with 🧪 TEST MODE (1 minute phases) and moved to the suggestion phase! Members can now suggest books using the \`/chapters-suggest-book\` command.`,
+        });
+
+        // Post announcement in the channel
+        await client.chat.postMessage({
+          channel: channelId,
+          text: `:books: *Book Club Cycle Started in TEST MODE!*\n\nA new book club cycle "${updatedCycle.getName()}" has been started in this channel with 1-minute phase durations for testing.\n\nWe are now in the *${capitalizeFirstLetter(
+            CyclePhase.SUGGESTION
+          )} Phase*. Use \`/chapters-suggest-book\` to suggest books for this cycle.\n\nThe suggestion phase will end in 1 minute.`,
+        });
+
+        return;
+      }
+
+      // For normal mode, validate the form values
       if (
         isNaN(suggestionPhaseDuration) ||
         isNaN(votingPhaseDuration) ||
@@ -248,6 +283,7 @@ export const registerCycleActions = (app: App): void => {
                 ],
               },
             ],
+            text: `Confirm book selection: "${winner.getBookName()}" by ${winner.getAuthor()}`,
           });
           return;
         } else {
@@ -425,6 +461,91 @@ export const registerCycleActions = (app: App): void => {
         channel: channelId,
         user: userId,
         text: "Phase change canceled.",
+      });
+    })
+  );
+
+  // Handler for confirming cycle reset
+  app.action(
+    ActionId.CONFIRM_CYCLE_RESET,
+    withActionErrorHandling(async ({ body, client }) => {
+      // ack() is called by the wrapper
+
+      const blockAction = body as BlockAction;
+      const userId = blockAction.user.id;
+      const channelId = blockAction.channel?.id;
+
+      if (!userId || !channelId) {
+        console.warn("Confirm cycle reset action missing user or channel ID.");
+        return;
+      }
+
+      try {
+        // Get the active cycle
+        const cycle = await validateActiveCycleExists(channelId);
+        const cycleName = cycle.getName();
+        const cycleId = cycle.getId();
+
+        // Remove the cycle from phase transition service tracking
+        phaseTransitionService.onCycleCompleted(channelId);
+
+        // Get database connection
+        const db = await connectToDatabase();
+
+        // Delete any suggestions for this cycle
+        await db.collection("suggestions").deleteMany({ cycleId: cycleId });
+
+        // Delete any votes for this cycle
+        await db.collection("votes").deleteMany({ cycleId: cycleId });
+
+        // Delete the cycle itself
+        await db.collection("cycles").deleteOne({ id: cycleId });
+
+        // Send a confirmation message to the user
+        await client.chat.postEphemeral({
+          channel: channelId,
+          user: userId,
+          text: `✅ Book club cycle "${cycleName}" has been completely reset. All data has been deleted. Use \`/chapters-start-cycle\` to start a new cycle.`,
+        });
+
+        // Post announcement in the channel
+        await client.chat.postMessage({
+          channel: channelId,
+          text: `:recycle: *Book Club Cycle Reset*\n\nThe book club cycle "${cycleName}" has been reset and all data has been deleted.\n\nTo start a new book club cycle, use the \`/chapters-start-cycle\` command.`,
+        });
+      } catch (error) {
+        console.error("Error resetting cycle:", error);
+        await client.chat.postEphemeral({
+          channel: channelId,
+          user: userId,
+          text: `❌ Error resetting book club cycle: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+        });
+      }
+    })
+  );
+
+  // Handler for canceling cycle reset
+  app.action(
+    ActionId.CANCEL_CYCLE_RESET,
+    withActionErrorHandling(async ({ body, client }) => {
+      // ack() is called by the wrapper
+
+      const blockAction = body as BlockAction;
+      const userId = blockAction.user.id;
+      const channelId = blockAction.channel?.id;
+
+      if (!userId || !channelId) {
+        console.warn("Cancel cycle reset action missing user or channel ID.");
+        return;
+      }
+
+      // Send an ephemeral message to confirm cancellation
+      await client.chat.postEphemeral({
+        channel: channelId,
+        user: userId,
+        text: "Cycle reset canceled. No changes were made.",
       });
     })
   );

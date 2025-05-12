@@ -124,6 +124,7 @@ export const sendBookSuggestionUI = async (
         ],
       },
     ],
+    text: "Suggest a Book Form",
   });
 };
 
@@ -224,6 +225,7 @@ export const sendSuggestionsListUI = async (
   await client.chat.postMessage({
     channel: command.channel_id,
     blocks,
+    text: "Book Suggestions for Current Cycle",
   });
 };
 

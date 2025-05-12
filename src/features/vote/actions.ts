@@ -52,15 +52,15 @@ export const registerVoteActions = (app: App): void => {
         values[BlockId.THIRD_CHOICE]?.[ActionId.THIRD_CHOICE_SELECT]
           ?.selected_option?.value;
 
-      // Validate at least first choice is selected
-      if (!firstChoiceId) {
-        throw new Error("You must select at least your first choice book.");
+      // Validate that all three choices are selected
+      if (!firstChoiceId || !secondChoiceId || !thirdChoiceId) {
+        throw new Error(
+          "You must select all three choices to cast your vote. Please select a first, second, and third choice book."
+        );
       }
 
       // Check for duplicates
-      const selectedIds = [firstChoiceId, secondChoiceId, thirdChoiceId].filter(
-        Boolean
-      );
+      const selectedIds = [firstChoiceId, secondChoiceId, thirdChoiceId];
       if (new Set(selectedIds).size !== selectedIds.length) {
         throw new Error("Please select different books for each choice.");
       }
@@ -70,8 +70,8 @@ export const registerVoteActions = (app: App): void => {
         userId,
         cycleId: cycle.getId(),
         firstChoice: firstChoiceId,
-        secondChoice: secondChoiceId || null,
-        thirdChoice: thirdChoiceId || null,
+        secondChoice: secondChoiceId,
+        thirdChoice: thirdChoiceId,
       });
 
       // Send confirmation to the user

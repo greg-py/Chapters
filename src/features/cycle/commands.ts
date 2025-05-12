@@ -11,7 +11,7 @@ import {
   sendCycleStatusMessage,
 } from "./ui";
 import { phaseTransitionService } from "../../index";
-import { CyclePhase } from "../../constants";
+import { CyclePhase, ActionId } from "../../constants";
 
 /**
  * Registers all cycle commands
@@ -101,6 +101,92 @@ export function registerCycleCommands(app: App): void {
         channel: command.channel_id,
         text: `:tada: *Book Club Cycle Completed!*\n\nThe book club cycle "${cycle.getName()}" has been completed and archived.\n\nTo start a new book club cycle, use the \`/chapters-start-cycle\` command.`,
       });
+    })
+  );
+
+  // Command to reset/clear the current book club cycle
+  app.command(
+    "/chapters-reset-cycle",
+    withErrorHandling(async ({ command, ack, client }) => {
+      await ack();
+
+      try {
+        // Validate active cycle exists first
+        const cycle = await validateActiveCycleExists(command.channel_id);
+
+        // Send a confirmation message with warning
+        await client.chat.postEphemeral({
+          channel: command.channel_id,
+          user: command.user_id,
+          blocks: [
+            {
+              type: "header",
+              text: {
+                type: "plain_text",
+                text: "⚠️ WARNING: Reset Book Club Cycle",
+                emoji: true,
+              },
+            },
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `You are about to *permanently delete* the current active book club cycle "*${cycle.getName()}*" in this channel.\n\nThis will:\n• Delete all book suggestions\n• Delete all votes\n• Clear phase transition timers\n• Allow starting a fresh cycle\n\n*This action cannot be undone.*`,
+              },
+            },
+            {
+              type: "actions",
+              elements: [
+                {
+                  type: "button",
+                  text: {
+                    type: "plain_text",
+                    text: "Yes, Reset Everything",
+                    emoji: true,
+                  },
+                  style: "danger",
+                  confirm: {
+                    title: {
+                      type: "plain_text",
+                      text: "Are you absolutely sure?",
+                    },
+                    text: {
+                      type: "plain_text",
+                      text: "This will permanently delete all cycle data.",
+                    },
+                    confirm: {
+                      type: "plain_text",
+                      text: "Yes, Delete Everything",
+                    },
+                    deny: {
+                      type: "plain_text",
+                      text: "Cancel",
+                    },
+                  },
+                  action_id: ActionId.CONFIRM_CYCLE_RESET,
+                },
+                {
+                  type: "button",
+                  text: {
+                    type: "plain_text",
+                    text: "Cancel",
+                    emoji: true,
+                  },
+                  action_id: ActionId.CANCEL_CYCLE_RESET,
+                },
+              ],
+            },
+          ],
+          text: "Warning: You are about to reset the book club cycle",
+        });
+      } catch (error) {
+        // If no active cycle exists, inform the user
+        await client.chat.postEphemeral({
+          channel: command.channel_id,
+          user: command.user_id,
+          text: "No active book club cycle to reset. Use `/chapters-start-cycle` to start a new cycle.",
+        });
+      }
     })
   );
 }
