@@ -60,66 +60,6 @@ const initializeApp = async () => {
 expressApp.use(express.json());
 expressApp.use(express.urlencoded({ extended: true }));
 
-// Verify Slack requests if needed
-const verifySlackRequest = (req, res, next) => {
-  // Skip verification in development or if no signing secret
-  if (
-    process.env.NODE_ENV !== "production" ||
-    !process.env.SLACK_APP_SIGNING_SECRET
-  ) {
-    return next();
-  }
-
-  try {
-    const slackSignature = req.headers["x-slack-signature"];
-    const timestamp = req.headers["x-slack-request-timestamp"];
-
-    if (!slackSignature || !timestamp) {
-      console.log("Missing Slack signature or timestamp");
-      return next();
-    }
-
-    // Skip outdated requests (helps prevent replay attacks)
-    const now = Math.floor(Date.now() / 1000);
-    if (Math.abs(now - timestamp) > 300) {
-      return res.status(400).send("Ignoring outdated request");
-    }
-
-    // Get raw body
-    const rawBody =
-      typeof req.body === "string"
-        ? req.body
-        : req.body && Object.keys(req.body).length === 0
-        ? ""
-        : JSON.stringify(req.body);
-
-    // Compute signature based on timestamp and body
-    const sigBasestring = "v0:" + timestamp + ":" + rawBody;
-    const mySignature =
-      "v0=" +
-      crypto
-        .createHmac("sha256", process.env.SLACK_APP_SIGNING_SECRET)
-        .update(sigBasestring, "utf8")
-        .digest("hex");
-
-    // Compare signatures
-    if (
-      crypto.timingSafeEqual(
-        Buffer.from(mySignature, "utf8"),
-        Buffer.from(slackSignature, "utf8")
-      )
-    ) {
-      return next();
-    } else {
-      console.error("Slack request verification failed");
-      return res.status(400).send("Verification failed");
-    }
-  } catch (error) {
-    console.error("Error verifying Slack request:", error);
-    next(); // Allow to pass in case of error, but log it
-  }
-};
-
 // Home endpoint
 expressApp.get("/", (req, res) => {
   res.status(200).json({
@@ -155,7 +95,7 @@ expressApp.get("/slack/interactions", (req, res) => {
 });
 
 // Special handler for Slack URL verification for events
-expressApp.post("/slack/events", verifySlackRequest, (req, res, next) => {
+expressApp.post("/slack/events", (req, res, next) => {
   // Log the request for debugging
   console.log("Received /slack/events request:", {
     type: req.body?.type,
@@ -173,7 +113,7 @@ expressApp.post("/slack/events", verifySlackRequest, (req, res, next) => {
 });
 
 // Special handler for Slack commands verification
-expressApp.post("/slack/commands", verifySlackRequest, (req, res, next) => {
+expressApp.post("/slack/commands", (req, res, next) => {
   // Log the request for debugging
   console.log("Received /slack/commands request:", {
     command: req.body?.command,
@@ -184,7 +124,7 @@ expressApp.post("/slack/commands", verifySlackRequest, (req, res, next) => {
 });
 
 // Special handler for Slack interactions verification
-expressApp.post("/slack/interactions", verifySlackRequest, (req, res, next) => {
+expressApp.post("/slack/interactions", (req, res, next) => {
   // Log the request for debugging
   console.log("Received /slack/interactions request:", {
     type: req.body?.type,
