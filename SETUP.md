@@ -112,3 +112,49 @@ For a production environment:
 3. Make sure your MongoDB instance is accessible from your hosting environment
 4. Set up your Slack app's Request URL to point to your deployed instance
 5. Deploy your application using `npm run build` and `npm start`
+
+## Deploying to Vercel
+
+If you're using Vercel, follow these steps:
+
+1. **Install and login to Vercel CLI** (optional)
+
+   ```
+   npm install -g vercel
+   vercel login
+   ```
+
+2. **Configure Environment Variables**
+
+   - Add all required environment variables in the Vercel dashboard (Project Settings > Environment Variables)
+   - Add the following variables:
+     - `SLACK_APP_BOT_TOKEN`
+     - `SLACK_APP_TOKEN`
+     - `SLACK_APP_SIGNING_SECRET`
+     - `MONGODB_URI` (use a cloud MongoDB instance like MongoDB Atlas)
+     - `NODE_ENV=production`
+
+3. **Deploy the App**
+
+   - Using Vercel CLI: Run `vercel` in the project root
+   - Or use the Vercel dashboard and connect your GitHub repository
+
+4. **Enable Socket Mode for Slack**
+
+   - Ensure your Slack app has Socket Mode enabled in the Slack App configuration page
+   - With Socket Mode, you don't need to specify a Request URL in your Slack app configuration
+   - Make sure your SLACK_APP_TOKEN has the `connections:write` scope
+
+5. **Verify the Deployment**
+
+   - Open your Vercel deployment URL (e.g., https://your-app-name.vercel.app/) to verify the app has deployed
+   - You should see a JSON response indicating the app is running
+   - Use `/chapters-ping` in Slack to test if your bot is responding
+
+6. **Troubleshooting**
+   - If the bot doesn't respond to commands, check the Vercel logs for errors
+   - Verify that all environment variables are set correctly
+   - Make sure your MongoDB instance is accessible from Vercel's servers
+   - Check that your Slack app has all required scopes and permissions
+
+Remember that Vercel functions run serverless, so there's no persistent server to maintain. The app will initialize when the API endpoint is first accessed, establishing the Socket Mode connection with Slack.
