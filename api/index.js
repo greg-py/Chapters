@@ -32,6 +32,12 @@ const expressApp = receiver.app;
 // Add request logging middleware
 expressApp.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  // Log request body type and headers (safely)
+  console.log("Request headers:", JSON.stringify(req.headers, null, 2));
+  if (req.body) {
+    console.log("Request body type:", req.body.type);
+    // Don't log the full body as it might contain sensitive data
+  }
   next();
 });
 
@@ -75,6 +81,7 @@ expressApp.post("/slack/events", async (req, res) => {
     await receiver.requestHandler(req, res);
   } catch (error) {
     console.error("Error handling /slack/events:", error);
+    console.error("Error stack:", error.stack);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -82,9 +89,24 @@ expressApp.post("/slack/events", async (req, res) => {
 expressApp.post("/slack/commands", async (req, res) => {
   console.log("Received POST request to /slack/commands");
   try {
+    // Log the command details (safely)
+    if (req.body) {
+      console.log("Command details:", {
+        command: req.body.command,
+        text: req.body.text,
+        user_id: req.body.user_id,
+        channel_id: req.body.channel_id,
+      });
+    }
     await receiver.requestHandler(req, res);
   } catch (error) {
     console.error("Error handling /slack/commands:", error);
+    console.error("Error stack:", error.stack);
+    // Log the full error details
+    console.error(
+      "Full error details:",
+      JSON.stringify(error, Object.getOwnPropertyNames(error))
+    );
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -95,6 +117,7 @@ expressApp.post("/slack/interactions", async (req, res) => {
     await receiver.requestHandler(req, res);
   } catch (error) {
     console.error("Error handling /slack/interactions:", error);
+    console.error("Error stack:", error.stack);
     res.status(500).json({ error: "Internal server error" });
   }
 });
