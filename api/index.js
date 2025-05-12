@@ -29,6 +29,12 @@ try {
 // Use the receiver's express app instance
 const expressApp = receiver.app;
 
+// Add request logging middleware
+expressApp.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
+
 // Basic home route (optional, but good for health checks)
 expressApp.get("/", (req, res) => {
   res.status(200).json({
@@ -60,6 +66,37 @@ expressApp.get("/slack/interactions", (req, res) => {
     message:
       "This is the Slack interactions endpoint. Slack will send POST requests here, not GET requests.",
   });
+});
+
+// Explicit POST handlers for Slack endpoints
+expressApp.post("/slack/events", async (req, res) => {
+  console.log("Received POST request to /slack/events");
+  try {
+    await receiver.requestHandler(req, res);
+  } catch (error) {
+    console.error("Error handling /slack/events:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+expressApp.post("/slack/commands", async (req, res) => {
+  console.log("Received POST request to /slack/commands");
+  try {
+    await receiver.requestHandler(req, res);
+  } catch (error) {
+    console.error("Error handling /slack/commands:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+expressApp.post("/slack/interactions", async (req, res) => {
+  console.log("Received POST request to /slack/interactions");
+  try {
+    await receiver.requestHandler(req, res);
+  } catch (error) {
+    console.error("Error handling /slack/interactions:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // Export the express app for Vercel
