@@ -31,6 +31,7 @@ export const CycleSchema = z.object({
   status: CycleStatusSchema,
   stats: CycleStatsSchema,
   phaseDurations: PhaseDurationsSchema,
+  selectedBookId: z.instanceof(ObjectId).optional(),
 });
 
 export type TCycleStatus = z.infer<typeof CycleStatusSchema>;

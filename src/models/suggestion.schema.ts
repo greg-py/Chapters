@@ -7,10 +7,12 @@ export const SuggestionSchema = z.object({
   userId: z.string(),
   bookName: z.string(),
   author: z.string(),
-  link: z.string().optional(),
+  link: z.string(),
   notes: z.string().optional(),
   createdAt: z.date(),
   votes: z.number().int().min(0).default(0),
+  totalPoints: z.number().int().min(0).default(0),
+  voters: z.array(z.string()).default([]),
 });
 
 export type TSuggestion = z.infer<typeof SuggestionSchema>;

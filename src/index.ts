@@ -1,8 +1,8 @@
 import { App } from "@slack/bolt";
 import dotenv from "dotenv";
 import { connectToDatabase } from "./db/connection";
-import { registerCommands } from "./commands";
-import { registerActions } from "./actions";
+import { registerFeatures } from "./features";
+import { PhaseTransitionService } from "./services/PhaseTransition";
 
 // Load environment variables
 dotenv.config();
@@ -46,17 +46,24 @@ app.error(async (error) => {
   console.error("Slack app error:", error);
 });
 
-// Register all commands
-registerCommands(app);
+// Register all features (commands and actions)
+registerFeatures(app);
 
-// Register all actions
-registerActions(app);
+// Initialize and start the Phase Transition Service
+// We use the getInstance method to ensure only one instance exists across the app
+export const phaseTransitionService = PhaseTransitionService.getInstance(
+  app,
+  60
+); // Check every 60 minutes
 
 // Start the app
 (async () => {
   try {
     // Connect to database
     await connectToDatabase();
+
+    // Start the phase transition service
+    phaseTransitionService.start();
 
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
     await app.start(port);

@@ -10,6 +10,7 @@ Chapters is a comprehensive Slack bot designed to streamline book club managemen
 - **Ranked Choice Voting**: Vote for preferred books using a ranked choice system
 - **Book Club Status**: Check the current status and phase of the book club
 - **Cycle History**: View past book club cycles with statistics and winning books
+- **Anonymous Suggestions**: Book suggestions are displayed anonymously to prevent bias in voting
 
 ## Getting Started
 
@@ -23,15 +24,18 @@ Chapters is a comprehensive Slack bot designed to streamline book club managemen
 
 Here's a complete list of all available commands:
 
-| Command                      | Short Description               | Usage Hint                   |
-| ---------------------------- | ------------------------------- | ---------------------------- |
-| `/chapters-ping`             | Check if the bot is running     | `/chapters-ping`             |
-| `/chapters-help`             | Show list of available commands | `/chapters-help`             |
-| `/chapters-start-cycle`      | Start a new book club cycle     | `/chapters-start-cycle`      |
-| `/chapters-cycle-status`     | Check current cycle information | `/chapters-cycle-status`     |
-| `/chapters-set-phase`        | Manually change book club phase | `/chapters-set-phase`        |
-| `/chapters-suggest-book`     | Open UI to suggest a book       | `/chapters-suggest-book`     |
-| `/chapters-view-suggestions` | View all book suggestions       | `/chapters-view-suggestions` |
+| Command                      | Short Description                      | Usage Hint                   |
+| ---------------------------- | -------------------------------------- | ---------------------------- |
+| `/chapters-ping`             | Check if the bot is running            | `/chapters-ping`             |
+| `/chapters-help`             | Show list of available commands        | `/chapters-help`             |
+| `/chapters-start-cycle`      | Start a new book club cycle            | `/chapters-start-cycle`      |
+| `/chapters-cycle-status`     | Check current cycle information        | `/chapters-cycle-status`     |
+| `/chapters-set-phase`        | Manually change book club phase        | `/chapters-set-phase`        |
+| `/chapters-suggest-book`     | Open UI to suggest a book              | `/chapters-suggest-book`     |
+| `/chapters-view-suggestions` | View all book suggestions              | `/chapters-view-suggestions` |
+| `/chapters-vote`             | Vote for your favorite books           | `/chapters-vote`             |
+| `/chapters-voting-results`   | View current voting results            | `/chapters-voting-results`   |
+| `/chapters-complete-cycle`   | Complete and archive the current cycle | `/chapters-complete-cycle`   |
 
 ## Detailed Command Descriptions
 
@@ -57,7 +61,7 @@ Initiates a new book club cycle with configurable phase durations. Opens a UI wh
 
 **Short Description:** Check current cycle information  
 **Usage Hint:** `/chapters-cycle-status`  
-Shows the current status of the active book club cycle, including cycle name, current phase, and phase deadline.
+Shows the current status of the active book club cycle, including cycle name, current phase, phase deadline, total book suggestions, and votes cast.
 
 ### `/chapters-set-phase`
 
@@ -69,13 +73,31 @@ Opens a UI where you can select which phase to transition to (suggestion, voting
 
 **Short Description:** Open UI to suggest a book  
 **Usage Hint:** `/chapters-suggest-book`  
-Opens a form UI where members can suggest a book for the current cycle by providing the book name, author, link, and optional notes.
+Opens a form UI where members can suggest a book for the current cycle by providing the book name, author, link (required), and optional notes. Suggestions are displayed anonymously to other users to prevent bias.
 
 ### `/chapters-view-suggestions`
 
 **Short Description:** View all book suggestions  
 **Usage Hint:** `/chapters-view-suggestions`  
-Displays all books that have been suggested for the current reading cycle, including details like title, author, links, and notes.
+Displays all books that have been suggested for the current reading cycle, including details like title, author, links, and notes. Suggestions are shown anonymously.
+
+### `/chapters-vote`
+
+**Short Description:** Vote for your favorite books  
+**Usage Hint:** `/chapters-vote`  
+Opens a voting UI where members can select their first, second, and third choices among the suggested books. Each vote allocates points in a ranked choice system (3 points for first choice, 2 for second, 1 for third).
+
+### `/chapters-voting-results`
+
+**Short Description:** View current voting results  
+**Usage Hint:** `/chapters-voting-results`  
+Shows the current standings in the voting process, with suggestions sorted by total points received. Displays medal emojis (🥇, 🥈, 🥉) for the top three books.
+
+### `/chapters-complete-cycle`
+
+**Short Description:** Complete and archive the current cycle  
+**Usage Hint:** `/chapters-complete-cycle`  
+Completes the current book club cycle, archives it, and allows a new cycle to be started. This command can only be used when the cycle is in the discussion phase.
 
 ## Book Club Cycle Lifecycle
 
@@ -83,8 +105,12 @@ Displays all books that have been suggested for the current reading cycle, inclu
 2. **Configuration**: Set up cycle name and phase durations (suggestion, voting, reading, discussion)
 3. **Suggestion Phase**: Members suggest books using `/chapters-suggest-book`
 4. **View Suggestions**: View all suggested books using `/chapters-view-suggestions`
-5. **Change Phases**: Transition between phases using `/chapters-set-phase` when ready
-6. **Check Status**: Monitor the current phase and deadlines with `/chapters-cycle-status`
+5. **Voting Phase**: Members vote on their favorite books using `/chapters-vote`
+6. **View Results**: Check voting results with `/chapters-voting-results`
+7. **Reading Phase**: Read the winning book selection
+8. **Discussion Phase**: Discuss the book with the group
+9. **Complete Cycle**: End the cycle with `/chapters-complete-cycle`
+10. **Check Status**: Monitor the current phase and deadlines with `/chapters-cycle-status`
 
 ## Development
 

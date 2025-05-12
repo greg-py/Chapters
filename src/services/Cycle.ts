@@ -1,6 +1,11 @@
 import { ObjectId } from "mongodb";
-import { connectToDatabase } from "../db/connection";
-import { getActiveCycleInChannel, createCycle, updateCycle } from "../dto";
+import { connectToDatabase } from "../db";
+import {
+  getActiveCycleInChannel,
+  createCycle,
+  updateCycle,
+  getSuggestionsByCycle,
+} from "../dto";
 import { DEFAULT_PHASE_DURATIONS } from "../config";
 import type {
   TCycleStatus,
@@ -22,7 +27,8 @@ export class Cycle {
     private readonly status: TCycleStatus,
     private readonly stats: TCycleStats,
     private readonly phaseDurations: TPhaseDurations,
-    private readonly currentPhase: TCyclePhase
+    private readonly currentPhase: TCyclePhase,
+    private readonly selectedBookId?: ObjectId
   ) {}
 
   /**
@@ -95,7 +101,8 @@ export class Cycle {
       cycle.status,
       cycle.stats,
       cycle.phaseDurations,
-      cycle.currentPhase
+      cycle.currentPhase,
+      cycle.selectedBookId
     );
   }
 
@@ -106,23 +113,60 @@ export class Cycle {
     name,
     phaseDurations,
     currentPhase,
+    selectedBookId,
+    status,
   }: {
     name?: string;
     phaseDurations?: TPhaseDurations;
     currentPhase?: TCyclePhase;
+    selectedBookId?: ObjectId | null;
+    status?: TCycleStatus;
   }) {
     const db = await connectToDatabase();
 
-    const modifiedCount = await updateCycle(db, {
+    // Create an update object that only includes properties that are defined
+    const updateData: {
+      id: ObjectId;
+      channelId: string;
+      name?: string;
+      phaseDurations?: TPhaseDurations;
+      currentPhase?: TCyclePhase;
+      selectedBookId?: ObjectId | undefined;
+      status?: TCycleStatus;
+    } = {
       id: this.id,
       channelId: this.channelId,
-      name,
-      phaseDurations,
-      currentPhase,
-    });
+    };
+
+    // Only add properties that are defined
+    if (name !== undefined && name !== this.name && name.trim() !== "")
+      updateData.name = name;
+    if (phaseDurations !== undefined)
+      updateData.phaseDurations = phaseDurations;
+    if (currentPhase !== undefined && currentPhase !== this.currentPhase)
+      updateData.currentPhase = currentPhase;
+    if (status !== undefined && status !== this.status)
+      updateData.status = status;
+    if (selectedBookId !== undefined) {
+      if (selectedBookId === null) {
+        // To clear the selected book, use $unset in MongoDB
+        // This is handled in the updateCycle function
+        updateData.selectedBookId = undefined;
+      } else {
+        updateData.selectedBookId = selectedBookId;
+      }
+    }
+
+    const modifiedCount = await updateCycle(db, updateData);
 
     if (modifiedCount === 0) {
       throw new Error("Failed to save cycle configuration. Please try again.");
+    }
+
+    let updatedSelectedBookId = this.selectedBookId;
+    if (selectedBookId !== undefined) {
+      updatedSelectedBookId =
+        selectedBookId === null ? undefined : selectedBookId;
     }
 
     return new Cycle(
@@ -130,10 +174,11 @@ export class Cycle {
       this.channelId,
       name || this.name,
       this.startDate,
-      this.status,
+      status || this.status,
       this.stats,
       phaseDurations || this.phaseDurations,
-      currentPhase || this.currentPhase
+      currentPhase || this.currentPhase,
+      updatedSelectedBookId
     );
   }
 
@@ -157,8 +202,22 @@ export class Cycle {
     return this.status;
   }
 
-  public getStats() {
-    return this.stats;
+  public async getStats() {
+    const db = await connectToDatabase();
+    const suggestions = await getSuggestionsByCycle(db, this.id);
+
+    // Count unique voters across all suggestions
+    const allVoters = new Set<string>();
+    suggestions.forEach((suggestion) => {
+      if (suggestion.voters && Array.isArray(suggestion.voters)) {
+        suggestion.voters.forEach((voter) => allVoters.add(voter));
+      }
+    });
+
+    return {
+      totalSuggestions: suggestions.length,
+      totalVotes: allVoters.size,
+    };
   }
 
   public getPhaseDurations() {
@@ -169,10 +228,20 @@ export class Cycle {
     return this.currentPhase;
   }
 
+  public getSelectedBookId() {
+    return this.selectedBookId;
+  }
+
   public getCurrentPhaseDeadline() {
     const now = new Date();
     const phase = this.currentPhase;
-    const duration = this.phaseDurations[phase as keyof TPhaseDurations];
+
+    // Add null check and fallback to default durations
+    const phaseDurations = this.phaseDurations || DEFAULT_PHASE_DURATIONS;
+    const duration =
+      phaseDurations[phase as keyof TPhaseDurations] ||
+      DEFAULT_PHASE_DURATIONS[phase as keyof typeof DEFAULT_PHASE_DURATIONS] ||
+      7; // Default to 7 days if all else fails
 
     // Convert days to milliseconds (days * 24 hours * 60 minutes * 60 seconds * 1000 milliseconds)
     return new Date(now.getTime() + duration * 24 * 60 * 60 * 1000);

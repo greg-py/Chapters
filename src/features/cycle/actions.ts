@@ -1,0 +1,431 @@
+import type { App, BlockAction, SlashCommand } from "@slack/bolt";
+import { Cycle, Suggestion, Vote } from "../../services";
+import { capitalizeFirstLetter, withActionErrorHandling } from "../../utils";
+import { ActionId, BlockId, CyclePhase } from "../../constants";
+import {
+  validateActiveCycleExists,
+  validateNoActiveCycleExists,
+} from "../../validators";
+import { ObjectId } from "mongodb";
+import { phaseTransitionService } from "../../index";
+
+/**
+ * Registers all cycle actions
+ * @param app - The Slack app
+ */
+export const registerCycleActions = (app: App): void => {
+  // FORM SUBMISSION: Handler for new book club cycle configuration
+  app.action(
+    ActionId.SUBMIT_CYCLE_CONFIG,
+    withActionErrorHandling(async ({ body, client }) => {
+      // ack() is called by the wrapper
+
+      const blockAction = body as BlockAction;
+      const userId = blockAction.user.id;
+      const channelId = blockAction.channel?.id;
+
+      if (!userId || !channelId) {
+        throw new Error("Missing user or channel ID in request.");
+      }
+
+      // Make sure there's an active cycle to configure
+      const cycle = await validateActiveCycleExists(channelId);
+
+      // Extract values from the form using block_id and action_id
+      const values = blockAction.state?.values;
+      if (!values) {
+        throw new Error("Could not read form values. Please try again.");
+      }
+
+      const cycleName =
+        values[BlockId.CYCLE_NAME]?.[ActionId.CYCLE_NAME_INPUT]?.value;
+      const suggestionPhaseDuration = parseInt(
+        values[BlockId.SUGGESTION_DURATION]?.[ActionId.SUGGESTION_DAYS_INPUT]
+          ?.value || "0",
+        10
+      );
+      const votingPhaseDuration = parseInt(
+        values[BlockId.VOTING_DURATION]?.[ActionId.VOTING_DAYS_INPUT]?.value ||
+          "0",
+        10
+      );
+      const readingPhaseDuration = parseInt(
+        values[BlockId.READING_DURATION]?.[ActionId.READING_DAYS_INPUT]
+          ?.value || "0",
+        10
+      );
+      const discussionPhaseDuration = parseInt(
+        values[BlockId.DISCUSSION_DURATION]?.[ActionId.DISCUSSION_DAYS_INPUT]
+          ?.value || "0",
+        10
+      );
+
+      // Validate inputs
+      if (!cycleName) {
+        throw new Error("Cycle Name is required. Please enter a valid name.");
+      }
+
+      if (
+        isNaN(suggestionPhaseDuration) ||
+        isNaN(votingPhaseDuration) ||
+        isNaN(readingPhaseDuration) ||
+        isNaN(discussionPhaseDuration) ||
+        suggestionPhaseDuration <= 0 ||
+        votingPhaseDuration <= 0 ||
+        readingPhaseDuration <= 0 ||
+        discussionPhaseDuration <= 0
+      ) {
+        throw new Error(
+          "All phase durations must be positive numbers. Please enter valid numbers."
+        );
+      }
+
+      // Update the cycle (already validated it exists)
+      const updatedCycle = await cycle.update({
+        name: cycleName,
+        phaseDurations: {
+          suggestion: suggestionPhaseDuration,
+          voting: votingPhaseDuration,
+          reading: readingPhaseDuration,
+          discussion: discussionPhaseDuration,
+        },
+        currentPhase: CyclePhase.SUGGESTION, // Start in suggestion phase after config
+      });
+
+      // Notify the phase transition service about the updated cycle
+      phaseTransitionService.onCycleUpdated(updatedCycle);
+
+      // Post confirmation message to user
+      await client.chat.postEphemeral({
+        channel: channelId,
+        user: userId,
+        text: `✅ Book club cycle "${updatedCycle.getName()}" configured successfully and moved to the suggestion phase! Members can now suggest books using the \`/chapters-suggest-book\` command.`,
+      });
+
+      // Post announcement in the channel
+      await client.chat.postMessage({
+        channel: channelId,
+        text: `:books: *Book Club Cycle Started!*\n\nA new book club cycle "${updatedCycle.getName()}" has been started in this channel.\n\nWe are now in the *${capitalizeFirstLetter(
+          CyclePhase.SUGGESTION
+        )} Phase*. Use \`/chapters-suggest-book\` to suggest books for this cycle.\n\nThe suggestion phase will end in ${suggestionPhaseDuration} days.`,
+      });
+    })
+  );
+
+  // Phase selection dropdown interaction - just ack
+  app.action(
+    ActionId.SELECT_PHASE,
+    withActionErrorHandling(async () => {})
+  );
+
+  // Handler for confirming phase change
+  app.action(
+    ActionId.CONFIRM_PHASE_CHANGE,
+    withActionErrorHandling(async ({ body, client }) => {
+      // ack() is called by the wrapper
+
+      const blockAction = body as BlockAction;
+      const userId = blockAction.user.id;
+      const channelId = blockAction.channel?.id;
+      if (!userId || !channelId) throw new Error("Missing user or channel ID.");
+
+      // Validate active cycle exists
+      const cycle = await validateActiveCycleExists(channelId);
+      const currentPhase = cycle.getCurrentPhase();
+
+      // Get and validate the selected phase from the dropdown
+      const values = blockAction.state?.values;
+      if (!values) throw new Error("Could not read phase selection from form.");
+      const selectedPhaseValue =
+        values[BlockId.PHASE_SELECTION]?.[ActionId.SELECT_PHASE]
+          ?.selected_option?.value;
+
+      if (!selectedPhaseValue) {
+        // This is user error, not system error - post ephemeral directly
+        await client.chat.postEphemeral({
+          channel: channelId,
+          user: userId,
+          text: "⚠️ Please select a phase before confirming.",
+        });
+        return; // Don't throw, just inform user
+      }
+
+      const selectedPhase = selectedPhaseValue as CyclePhase;
+      if (!Object.values(CyclePhase).includes(selectedPhase)) {
+        // This indicates a potential issue with the UI options vs Enum
+        throw new Error(`Invalid phase value selected: ${selectedPhaseValue}`);
+      }
+
+      // Get current book suggestions for the cycle
+      const suggestions = await Suggestion.getAllForCycle(cycle.getId());
+
+      // --- VALIDATION RULES ---
+
+      // RULE 1: If currently in suggestion phase, need at least 3 suggestions to move on
+      if (
+        currentPhase === CyclePhase.SUGGESTION &&
+        selectedPhase !== CyclePhase.SUGGESTION &&
+        suggestions.length < 3
+      ) {
+        await client.chat.postEphemeral({
+          channel: channelId,
+          user: userId,
+          text: `⚠️ At least 3 book suggestions are required before moving to the ${capitalizeFirstLetter(
+            selectedPhase
+          )} phase. Currently have ${suggestions.length} suggestion${
+            suggestions.length === 1 ? "" : "s"
+          }.`,
+        });
+        return;
+      }
+
+      // RULE 2: If moving to reading or discussion phase, must have a selected book
+      const selectedBookId = cycle.getSelectedBookId();
+      if (
+        (selectedPhase === CyclePhase.READING ||
+          selectedPhase === CyclePhase.DISCUSSION) &&
+        !selectedBookId
+      ) {
+        // If coming from voting phase, we could try to auto-select the winner book
+        if (currentPhase === CyclePhase.VOTING) {
+          // Check if there are any votes at all
+          const hasAnyVotes = suggestions.some((s) => s.getTotalPoints() > 0);
+          if (!hasAnyVotes) {
+            await client.chat.postEphemeral({
+              channel: channelId,
+              user: userId,
+              text: `⚠️ No votes have been cast yet. Members need to vote using \`/chapters-vote\` before moving to the ${capitalizeFirstLetter(
+                selectedPhase
+              )} phase.`,
+            });
+            return;
+          }
+
+          // Sort suggestions by votes to get the winner
+          const winner = [...suggestions].sort(
+            (a, b) => b.getTotalPoints() - a.getTotalPoints()
+          )[0];
+
+          // Confirm with the user that we'll select this book
+          await client.chat.postEphemeral({
+            channel: channelId,
+            user: userId,
+            blocks: [
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: `Based on voting results, *"${winner.getBookName()}"* by *${winner.getAuthor()}* will be selected as the book for this cycle.`,
+                },
+              },
+              {
+                type: "actions",
+                elements: [
+                  {
+                    type: "button",
+                    text: {
+                      type: "plain_text",
+                      text: "Confirm Selection & Change Phase",
+                      emoji: true,
+                    },
+                    style: "primary",
+                    value: JSON.stringify({
+                      phase: selectedPhase,
+                      bookId: winner.getId().toString(),
+                    }),
+                    action_id: ActionId.SELECT_BOOK_AND_CHANGE_PHASE,
+                  },
+                  {
+                    type: "button",
+                    text: {
+                      type: "plain_text",
+                      text: "Cancel",
+                      emoji: true,
+                    },
+                    style: "danger",
+                    action_id: ActionId.CANCEL_PHASE_CHANGE,
+                  },
+                ],
+              },
+            ],
+          });
+          return;
+        } else {
+          // Not coming from voting phase - need to select a book first
+          await client.chat.postEphemeral({
+            channel: channelId,
+            user: userId,
+            text: `⚠️ A book must be selected before moving to the ${capitalizeFirstLetter(
+              selectedPhase
+            )} phase. Complete the voting process first.`,
+          });
+          return;
+        }
+      }
+
+      // RULE 3: If moving back to suggestion phase, clear selected book and votes
+      let updateData: {
+        currentPhase: CyclePhase;
+        selectedBookId?: null;
+      } = { currentPhase: selectedPhase };
+
+      let confirmationMsg = `✅ The book club cycle has been moved to the ${capitalizeFirstLetter(
+        selectedPhase
+      )} phase.`;
+      let announcementMsg = `:rotating_light: *Book Club Phase Change*\n\nThe "${cycle.getName()}" book club cycle has moved to the *${capitalizeFirstLetter(
+        selectedPhase
+      )} Phase*.`;
+
+      if (
+        selectedPhase === CyclePhase.SUGGESTION &&
+        (currentPhase === CyclePhase.VOTING ||
+          currentPhase === CyclePhase.READING ||
+          currentPhase === CyclePhase.DISCUSSION)
+      ) {
+        // Clear the selected book
+        updateData.selectedBookId = null;
+
+        // Reset all votes for the cycle
+        await Vote.resetVotesForCycle(cycle.getId());
+
+        // Add warning to the confirmation message
+        confirmationMsg += ` Any previously selected book has been cleared and all votes have been reset, but existing suggestions have been kept.`;
+
+        // Add to announcement
+        announcementMsg += `\n\nThis is a reset back to the suggestion phase. Any previously selected book has been cleared and all votes have been reset, but existing suggestions remain. Members can now suggest additional books using \`/chapters-suggest-book\`.`;
+      }
+
+      // Update the cycle
+      const updatedCycle = await cycle.update(updateData);
+
+      // Notify the phase transition service about the updated cycle
+      phaseTransitionService.onCycleUpdated(updatedCycle);
+
+      // Send confirmation to the user
+      await client.chat.postEphemeral({
+        channel: channelId,
+        user: userId,
+        text: confirmationMsg,
+      });
+
+      // Get phase duration for the announcement
+      const phaseDurations = updatedCycle.getPhaseDurations();
+      const duration =
+        selectedPhase !== CyclePhase.PENDING
+          ? phaseDurations[selectedPhase as keyof typeof phaseDurations]
+          : undefined;
+      const phaseDurationText = duration
+        ? `\nThis phase will end in ${duration} days.`
+        : "";
+
+      // Add phase-specific instructions
+      let phaseInstructions = "";
+      if (selectedPhase === CyclePhase.SUGGESTION) {
+        phaseInstructions = `\nUse \`/chapters-suggest-book\` to suggest books for this cycle.`;
+      } else if (selectedPhase === CyclePhase.VOTING) {
+        phaseInstructions = `\nUse \`/chapters-vote\` to cast your vote for your favorite books.`;
+      } else if (selectedPhase === CyclePhase.READING) {
+        if (selectedBookId) {
+          const selectedBook = await Suggestion.getById(selectedBookId);
+          if (selectedBook) {
+            announcementMsg += `\n\nThe book selected for this cycle is *"${selectedBook.getBookName()}"* by *${selectedBook.getAuthor()}*.`;
+          }
+        }
+      }
+
+      announcementMsg += `${phaseInstructions}${phaseDurationText}`;
+
+      // Post announcement in the channel
+      await client.chat.postMessage({
+        channel: channelId,
+        text: announcementMsg,
+      });
+    })
+  );
+
+  // Handler for selecting book & changing phase in one action
+  app.action(
+    ActionId.SELECT_BOOK_AND_CHANGE_PHASE,
+    withActionErrorHandling(async ({ body, client, action }) => {
+      const blockAction = body as BlockAction;
+      const userId = blockAction.user.id;
+      const channelId = blockAction.channel?.id;
+      if (!userId || !channelId) throw new Error("Missing user or channel ID.");
+
+      // Validate active cycle exists
+      const cycle = await validateActiveCycleExists(channelId);
+
+      // Get the data from the button value
+      const buttonAction = action as any;
+      const valueData = JSON.parse(buttonAction.value);
+      const selectedPhase = valueData.phase as CyclePhase;
+      const selectedBookId = new ObjectId(valueData.bookId);
+
+      // Update the cycle with the selected book and new phase
+      const updatedCycle = await cycle.update({
+        currentPhase: selectedPhase,
+        selectedBookId: selectedBookId,
+      });
+
+      // Notify the phase transition service about the updated cycle
+      phaseTransitionService.onCycleUpdated(updatedCycle);
+
+      // Get the selected book details
+      const selectedBook = await Suggestion.getById(selectedBookId);
+
+      if (!selectedBook) {
+        throw new Error("Selected book not found. Please try again.");
+      }
+
+      // Post confirmation message to the user
+      await client.chat.postEphemeral({
+        channel: channelId,
+        user: userId,
+        text: `✅ The book club cycle has been moved to the ${capitalizeFirstLetter(
+          selectedPhase
+        )} phase with "${selectedBook.getBookName()}" by ${selectedBook.getAuthor()} selected as the book.`,
+      });
+
+      // Post announcement in the channel
+      const phaseDurations = updatedCycle.getPhaseDurations();
+      const duration =
+        selectedPhase !== CyclePhase.PENDING
+          ? phaseDurations[selectedPhase as keyof typeof phaseDurations]
+          : undefined;
+      const phaseDurationText = duration
+        ? `\nThis phase will end in ${duration} days.`
+        : "";
+
+      await client.chat.postMessage({
+        channel: channelId,
+        text: `:rotating_light: *Book Club Phase Change*\n\nThe "${updatedCycle.getName()}" book club cycle has moved to the *${capitalizeFirstLetter(
+          selectedPhase
+        )} Phase* with *"${selectedBook.getBookName()}"* by *${selectedBook.getAuthor()}* selected as the book to read.${phaseDurationText}`,
+      });
+    })
+  );
+
+  // Handler for canceling phase change
+  app.action(
+    ActionId.CANCEL_PHASE_CHANGE,
+    withActionErrorHandling(async ({ body, client }) => {
+      // ack() is called by the wrapper
+
+      const blockAction = body as BlockAction;
+      const userId = blockAction.user.id;
+      const channelId = blockAction.channel?.id;
+
+      if (!userId || !channelId) {
+        console.warn("Cancel phase change action missing user or channel ID.");
+        return;
+      }
+
+      // Send an ephemeral message to confirm cancellation
+      await client.chat.postEphemeral({
+        channel: channelId,
+        user: userId,
+        text: "Phase change canceled.",
+      });
+    })
+  );
+};

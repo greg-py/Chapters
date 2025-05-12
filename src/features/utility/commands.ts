@@ -1,6 +1,10 @@
-import { App } from "@slack/bolt";
-import { withErrorHandling } from "../utils/errors";
+import type { App } from "@slack/bolt";
+import { withErrorHandling } from "../../utils";
 
+/**
+ * Registers utility commands (help, ping)
+ * @param app - The Slack app
+ */
 export function registerUtilityCommands(app: App): void {
   // Simple ping command for testing
   app.command(

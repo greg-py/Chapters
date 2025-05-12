@@ -1,5 +1,5 @@
 import { ObjectId } from "mongodb";
-import { connectToDatabase } from "../db/connection";
+import { connectToDatabase } from "../db";
 import {
   createSuggestion,
   getSuggestionById,
@@ -19,10 +19,12 @@ export class Suggestion {
     private readonly userId: string,
     private readonly bookName: string,
     private readonly author: string,
-    private readonly link: string | undefined,
+    private readonly link: string,
     private readonly notes: string | undefined,
     private readonly createdAt: Date,
-    private readonly votes: number
+    private readonly votes: number,
+    private readonly totalPoints: number = 0,
+    private readonly voters: string[] = []
   ) {}
 
   /**
@@ -33,7 +35,7 @@ export class Suggestion {
     userId: string,
     bookName: string,
     author: string,
-    link?: string,
+    link: string,
     notes?: string
   ): Promise<Suggestion> {
     const db = await connectToDatabase();
@@ -48,6 +50,8 @@ export class Suggestion {
       notes,
       createdAt: new Date(),
       votes: 0,
+      totalPoints: 0,
+      voters: [],
     };
 
     // Insert the suggestion into the database
@@ -62,7 +66,9 @@ export class Suggestion {
       suggestion.link,
       suggestion.notes,
       suggestion.createdAt,
-      suggestion.votes
+      suggestion.votes,
+      suggestion.totalPoints,
+      suggestion.voters
     );
   }
 
@@ -86,7 +92,9 @@ export class Suggestion {
       suggestion.link,
       suggestion.notes,
       suggestion.createdAt,
-      suggestion.votes
+      suggestion.votes,
+      suggestion.totalPoints,
+      suggestion.voters
     );
   }
 
@@ -108,8 +116,29 @@ export class Suggestion {
           suggestion.link,
           suggestion.notes,
           suggestion.createdAt,
-          suggestion.votes
+          suggestion.votes,
+          suggestion.totalPoints,
+          suggestion.voters
         )
+    );
+  }
+
+  /**
+   * Check if a user has already voted in the cycle
+   * @param userId - The ID of the user to check
+   * @param cycleId - The ID of the cycle
+   * @returns true if the user has already voted, false otherwise
+   */
+  public static async hasUserVotedInCycle(
+    userId: string,
+    cycleId: ObjectId
+  ): Promise<boolean> {
+    const db = await connectToDatabase();
+    const suggestions = await getSuggestionsByCycle(db, cycleId);
+
+    // Check if the user exists in any suggestion's voters array for this cycle
+    return suggestions.some((suggestion) =>
+      suggestion.voters?.includes(userId)
     );
   }
 
@@ -138,7 +167,47 @@ export class Suggestion {
       this.link,
       this.notes,
       this.createdAt,
-      newVoteCount
+      newVoteCount,
+      this.totalPoints,
+      this.voters
+    );
+  }
+
+  /**
+   * Add points for ranked choice voting
+   * @param points - The points to add (3 for 1st choice, 2 for 2nd, 1 for 3rd)
+   * @param voterId - The ID of the user who voted
+   */
+  public async addRankedChoicePoints(
+    points: number,
+    voterId: string
+  ): Promise<Suggestion> {
+    const db = await connectToDatabase();
+    const newTotalPoints = this.totalPoints + points;
+    const newVoters = [...this.voters, voterId];
+
+    const modifiedCount = await updateSuggestion(db, {
+      id: this.id,
+      totalPoints: newTotalPoints,
+      voters: newVoters,
+    });
+
+    if (modifiedCount === 0) {
+      throw new Error("Failed to update vote points. Please try again.");
+    }
+
+    return new Suggestion(
+      this.id,
+      this.cycleId,
+      this.userId,
+      this.bookName,
+      this.author,
+      this.link,
+      this.notes,
+      this.createdAt,
+      this.votes,
+      newTotalPoints,
+      newVoters
     );
   }
 
@@ -186,6 +255,14 @@ export class Suggestion {
 
   public getVotes() {
     return this.votes;
+  }
+
+  public getTotalPoints() {
+    return this.totalPoints;
+  }
+
+  public getVoters() {
+    return this.voters;
   }
 
   /**
