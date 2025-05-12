@@ -2,15 +2,15 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/**/*.js",
-      "use": "@vercel/node"
-    },
-    {
       "src": "package.json",
       "use": "@vercel/node",
       "config": {
-        "buildCommand": "npm run vercel-build"
+        "buildCommand": "npm run build"
       }
+    },
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -20,6 +20,7 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "USE_SOCKET_MODE": "false"
   }
 }

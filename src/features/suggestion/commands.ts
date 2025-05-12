@@ -15,9 +15,7 @@ export const registerSuggestionCommands = (app: App): void => {
   // Command to open suggestion UI to add a book suggestion to the cycle
   app.command(
     "/chapters-suggest-book",
-    withErrorHandling(async ({ command, ack, client }) => {
-      await ack();
-
+    withErrorHandling(async ({ command, client }) => {
       // Validate cycle exists and is in suggestion phase
       const cycle = await validateActiveCycleExists(command.channel_id);
       validateSuggestionPrerequisites(cycle);
@@ -29,9 +27,7 @@ export const registerSuggestionCommands = (app: App): void => {
   // Command to post the current cycle's book suggestions list to the channel
   app.command(
     "/chapters-view-suggestions",
-    withErrorHandling(async ({ command, ack, client }) => {
-      await ack();
-
+    withErrorHandling(async ({ command, client }) => {
       // Validate cycle exists
       const cycle = await validateActiveCycleExists(command.channel_id);
       // No specific phase required to view suggestions

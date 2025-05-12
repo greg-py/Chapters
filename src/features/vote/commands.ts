@@ -15,9 +15,7 @@ export const registerVoteCommands = (app: App): void => {
   // Command to vote on suggestions
   app.command(
     "/chapters-vote",
-    withErrorHandling(async ({ command, ack, client }) => {
-      await ack();
-
+    withErrorHandling(async ({ command, client }) => {
       // Validate cycle exists
       const cycle = await validateActiveCycleExists(command.channel_id);
 
@@ -35,9 +33,7 @@ export const registerVoteCommands = (app: App): void => {
   // Command to view voting results
   app.command(
     "/chapters-voting-results",
-    withErrorHandling(async ({ command, ack, client }) => {
-      await ack();
-
+    withErrorHandling(async ({ command, client }) => {
       // Validate cycle exists
       const cycle = await validateActiveCycleExists(command.channel_id);
       // No specific phase required to view results, but might want to check if voting/reading/discussion phase?

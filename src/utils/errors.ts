@@ -49,20 +49,33 @@ export function withErrorHandling<
   T extends SlackCommandMiddlewareArgs & { client: WebClient }
 >(handler: (args: T) => Promise<void>): (args: T) => Promise<void> {
   return async (args: T) => {
+    // Extract ack to call it first and save client/command for potential error handling
+    const { ack, client, command } = args;
+
+    // Always acknowledge the command first thing - this is critical
     try {
-      // Acknowledge command immediately if required (usually done by Bolt automatically for commands)
+      await ack();
+    } catch (ackError) {
+      console.error("Failed to acknowledge command:", ackError);
+    }
+
+    try {
+      // Run the handler with all original parameters
       await handler(args);
     } catch (error) {
       console.error("Command error:", error);
       const errorMessage =
         error instanceof Error ? error.message : "An unknown error occurred";
-      // Commands guarantee command.channel_id and command.user_id
-      await sendEphemeralError(
-        args.client,
-        errorMessage,
-        args.command.channel_id,
-        args.command.user_id
-      );
+
+      // Send an ephemeral error message to the user
+      if (command && command.channel_id && command.user_id) {
+        await sendEphemeralError(
+          client,
+          errorMessage,
+          command.channel_id,
+          command.user_id
+        );
+      }
     }
   };
 }

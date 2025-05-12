@@ -70,6 +70,22 @@ export function createApp(options: { receiver?: ExpressReceiver } = {}) {
   // Determine if we should use Socket Mode based on environment variable
   const useSocketMode = process.env.USE_SOCKET_MODE === "true";
 
+  let receiver = options.receiver;
+
+  // If not using Socket Mode and no receiver provided, create an ExpressReceiver
+  if (!useSocketMode && !receiver) {
+    receiver = new ExpressReceiver({
+      signingSecret: process.env.SLACK_APP_SIGNING_SECRET || "",
+      processBeforeResponse: true, // Required for Vercel/serverless
+      // Explicitly set endpoints for different Slack interactions
+      endpoints: {
+        events: "/slack/events",
+        commands: "/slack/commands",
+        interactions: "/slack/interactions",
+      },
+    });
+  }
+
   // Initialize Slack app with appropriate settings based on mode
   const app = new App({
     token: process.env.SLACK_APP_BOT_TOKEN,
@@ -82,7 +98,9 @@ export function createApp(options: { receiver?: ExpressReceiver } = {}) {
       process.env.NODE_ENV === "production" ? LogLevel.ERROR : LogLevel.INFO,
     // Add custom request handling timeouts (ms)
     processBeforeResponse: true,
-    // Use provided receiver if available
+    // Use our created receiver if available
+    ...(receiver ? { receiver } : {}),
+    // Include any other options
     ...options,
   });
 

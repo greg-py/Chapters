@@ -9,8 +9,7 @@ export function registerUtilityCommands(app: App): void {
   // Simple ping command for testing
   app.command(
     "/chapters-ping",
-    withErrorHandling(async ({ ack, say }) => {
-      await ack();
+    withErrorHandling(async ({ say }) => {
       await say("Pong! Chapters is up and running!");
     })
   );
@@ -18,8 +17,7 @@ export function registerUtilityCommands(app: App): void {
   // Help command
   app.command(
     "/chapters-help",
-    withErrorHandling(async ({ ack, say }) => {
-      await ack();
+    withErrorHandling(async ({ say }) => {
       await say({
         text: "Chapters Help",
         blocks: [

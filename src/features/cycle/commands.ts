@@ -21,9 +21,7 @@ export function registerCycleCommands(app: App): void {
   // Command to open phase configuration UI to start a new book club cycle
   app.command(
     "/chapters-start-cycle",
-    withErrorHandling(async ({ command, ack, client }) => {
-      await ack();
-
+    withErrorHandling(async ({ command, client }) => {
       // Validate no active cycle exists
       await validateNoActiveCycleExists(command.channel_id);
 
@@ -41,9 +39,7 @@ export function registerCycleCommands(app: App): void {
   // Command to retrieve current active cycle information
   app.command(
     "/chapters-cycle-status",
-    withErrorHandling(async ({ command, ack, client }) => {
-      await ack();
-
+    withErrorHandling(async ({ command, client }) => {
       // Validate active cycle exists
       const cycle = await validateActiveCycleExists(command.channel_id);
 
@@ -54,9 +50,7 @@ export function registerCycleCommands(app: App): void {
   // Command to change the phase of the current cycle
   app.command(
     "/chapters-set-phase",
-    withErrorHandling(async ({ command, ack, client }) => {
-      await ack();
-
+    withErrorHandling(async ({ command, client }) => {
       // Validate active cycle exists
       const cycle = await validateActiveCycleExists(command.channel_id);
 
@@ -67,9 +61,7 @@ export function registerCycleCommands(app: App): void {
   // Command to complete and archive the current book club cycle
   app.command(
     "/chapters-complete-cycle",
-    withErrorHandling(async ({ command, ack, client }) => {
-      await ack();
-
+    withErrorHandling(async ({ command, client }) => {
       // Validate active cycle exists
       const cycle = await validateActiveCycleExists(command.channel_id);
 
@@ -107,9 +99,7 @@ export function registerCycleCommands(app: App): void {
   // Command to reset/clear the current book club cycle
   app.command(
     "/chapters-reset-cycle",
-    withErrorHandling(async ({ command, ack, client }) => {
-      await ack();
-
+    withErrorHandling(async ({ command, client }) => {
       try {
         // Validate active cycle exists first
         const cycle = await validateActiveCycleExists(command.channel_id);
