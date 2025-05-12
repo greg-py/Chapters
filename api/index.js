@@ -5,7 +5,6 @@ const { App, ExpressReceiver } = require("@slack/bolt");
 // Initialize an ExpressReceiver
 const receiver = new ExpressReceiver({
   signingSecret: process.env.SLACK_APP_SIGNING_SECRET,
-  endpoints: "/slack/events", // default endpoint for events, commands, interactions
   processBeforeResponse: true, // Required for Vercel/serverless
 });
 
