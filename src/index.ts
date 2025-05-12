@@ -1,8 +1,9 @@
 import { App } from "@slack/bolt";
 import dotenv from "dotenv";
-import { connectToDatabase } from "./db/connection";
+import { connectToDatabase, closeDatabaseConnection } from "./db/connection";
 import { registerFeatures } from "./features";
 import { PhaseTransitionService } from "./services/PhaseTransition";
+import { LogLevel } from "@slack/logger";
 
 // Load environment variables
 dotenv.config();
@@ -21,6 +22,10 @@ const requiredEnvVars = [
     name: "SLACK_APP_SIGNING_SECRET",
     description: "Signing Secret from Basic Information",
   },
+  {
+    name: "MONGODB_URI",
+    description: "MongoDB Connection URI",
+  },
 ];
 
 const missingVars = requiredEnvVars.filter((v) => !process.env[v.name]);
@@ -33,12 +38,17 @@ if (missingVars.length > 0) {
   process.exit(1);
 }
 
-// Initialize Slack app
+// Initialize Slack app with production-ready settings
 const app = new App({
   token: process.env.SLACK_APP_BOT_TOKEN,
   signingSecret: process.env.SLACK_APP_SIGNING_SECRET,
   socketMode: true,
   appToken: process.env.SLACK_APP_TOKEN,
+  // For production, explicitly set additional security options
+  logLevel:
+    process.env.NODE_ENV === "production" ? LogLevel.ERROR : LogLevel.INFO,
+  // Add custom request handling timeouts (ms)
+  processBeforeResponse: true,
 });
 
 // Log all errors
@@ -53,8 +63,22 @@ registerFeatures(app);
 // We use the getInstance method to ensure only one instance exists across the app
 export const phaseTransitionService = PhaseTransitionService.getInstance(
   app,
-  60
-); // Check every 60 minutes
+  process.env.TEST_MODE === "true" ? 10 : 60 // 10 seconds for test mode, 60 minutes for production
+);
+
+// Add global error handlers for uncaught exceptions and unhandled rejections
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception:", error);
+  // In production, we might want to perform cleanup before exiting
+  closeDatabaseConnection().finally(() => {
+    process.exit(1);
+  });
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  // Note: We don't exit the process here since it could be recoverable
+});
 
 // Start the app
 (async () => {
@@ -68,8 +92,15 @@ export const phaseTransitionService = PhaseTransitionService.getInstance(
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
     await app.start(port);
     console.log(`⚡️ Chapters is running on port ${port}!`);
+
+    // Log environment mode for visibility
+    console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+    if (process.env.TEST_MODE === "true") {
+      console.log("⚠️ Running in TEST MODE - not suitable for production!");
+    }
   } catch (error) {
     console.error("Error starting the app:", error);
+    await closeDatabaseConnection();
     process.exit(1);
   }
 })();
