@@ -166,3 +166,120 @@ Benefits:
 - Ensures consistent error responses
 - Centralizes error logging
 - Makes command handlers more readable
+
+## Local Development
+
+### Prerequisites
+
+1. Node.js v16 or higher
+2. npm
+3. ngrok (for local testing with Slack)
+4. A Slack workspace with permission to install apps
+5. MongoDB (local or remote)
+
+### Setup
+
+1. Clone the repository:
+
+   ```bash
+   git clone <repository-url>
+   cd Chapters
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+3. Create a `.env` file in the project root with the following variables:
+
+   ```
+   # Slack App Credentials
+   SLACK_APP_BOT_TOKEN=xoxb-your-bot-token-here
+   SLACK_APP_SIGNING_SECRET=your-signing-secret-here
+
+   # MongoDB Configuration
+   MONGODB_URI=mongodb://localhost:27017/chapters
+
+   # Application Configuration
+   NODE_ENV=development
+   USE_SOCKET_MODE=false
+   ```
+
+4. Start MongoDB (if using local instance):
+   ```bash
+   npm run db:start
+   ```
+
+### Running Locally for Slack Integration Testing
+
+1. Start the development server in HTTP mode:
+
+   ```bash
+   npm run dev:http
+   ```
+
+2. In a separate terminal, start ngrok to create a tunnel to your local server:
+
+   ```bash
+   ngrok http 3000
+   ```
+
+3. Copy the ngrok URL (like `https://abc123.ngrok.io`) and set up your Slack app:
+
+   - Go to your [Slack App Dashboard](https://api.slack.com/apps)
+   - Select your app and navigate to **Event Subscriptions**
+   - Enable events and set the Request URL to: `https://your-ngrok-url/slack/events`
+   - Navigate to **Slash Commands** and update the command Request URLs to: `https://your-ngrok-url/slack/events`
+   - Navigate to **Interactivity & Shortcuts** and set the Request URL to: `https://your-ngrok-url/slack/events`
+
+4. Test your slash commands and interactions in Slack!
+
+## Deployment to Vercel
+
+### Prerequisites
+
+1. A Vercel account
+2. The Vercel CLI (optional for direct deployments)
+3. A MongoDB database (Atlas recommended for production)
+
+### Setup
+
+1. Connect your repository to Vercel:
+
+   - Go to [Vercel Dashboard](https://vercel.com/dashboard)
+   - Import your Git repository
+   - Configure the project settings
+
+2. Set environment variables in Vercel:
+
+   - `SLACK_APP_BOT_TOKEN`: Your Slack bot token
+   - `SLACK_APP_SIGNING_SECRET`: Your Slack signing secret
+   - `MONGODB_URI`: Your MongoDB connection URI
+   - `NODE_ENV`: `production`
+   - `USE_SOCKET_MODE`: `false`
+
+3. Deploy to Vercel:
+
+   ```bash
+   vercel --prod
+   ```
+
+4. Once deployed, update your Slack app configuration:
+   - Use `https://your-vercel-url/api/slack/events` for all Request URLs
+
+## Available Scripts
+
+- `npm run build`: Build the TypeScript files
+- `npm run start`: Start the production server
+- `npm run dev`: Start the development server using TypeScript and nodemon
+- `npm run dev:http`: Start the HTTP API server for Slack integration with ngrok
+- `npm run db:start`: Start a local MongoDB instance using Docker
+
+## Project Structure
+
+- `api/`: Vercel serverless functions
+- `src/`: TypeScript source code
+- `dist/`: Compiled JavaScript files
+- `docs/`: Documentation files

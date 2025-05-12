@@ -1,126 +1,74 @@
-// This is a handler for Vercel serverless functions
-// It imports and starts the app, providing HTTP endpoints for Slack when not using Socket Mode
+// Vercel serverless function handler for Slack API requests
+require("dotenv").config();
+
 const { App, ExpressReceiver } = require("@slack/bolt");
 
-// Initialize an ExpressReceiver
+// Set environment variable for HTTP mode
+process.env.USE_SOCKET_MODE = "false";
+
+// Create an ExpressReceiver for handling HTTP requests
 const receiver = new ExpressReceiver({
   signingSecret: process.env.SLACK_APP_SIGNING_SECRET,
   processBeforeResponse: true, // Required for Vercel/serverless
+  // Explicitly set endpoints for different Slack interactions
+  endpoints: {
+    events: "/slack/events",
+    commands: "/slack/commands",
+    interactions: "/slack/interactions",
+  },
 });
 
-// Initialize the Bolt app with the receiver
+// Initialize the app
 const app = new App({
   token: process.env.SLACK_APP_BOT_TOKEN,
   receiver: receiver,
-  // processBeforeResponse: true, // Already set in receiver options
+  processBeforeResponse: true, // Critical for serverless
 });
 
-// Load your app functionality (listeners, etc.)
-// It's crucial that this happens *before* the express app is exported
-try {
-  require("../dist/index")(app); // Assuming your compiled listeners are here
-  console.log("⚡️ Bolt app listeners registered!");
-} catch (error) {
-  console.error("Error loading app functionality:", error);
-  // Optionally, throw the error or handle it gracefully
-  // throw new Error("Failed to load app functionality");
-}
-
-// Use the receiver's express app instance
+// Get the Express app from the receiver
 const expressApp = receiver.app;
 
-// Add request logging middleware
-expressApp.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  // Log request body type and headers (safely)
-  console.log("Request headers:", JSON.stringify(req.headers, null, 2));
-  if (req.body) {
-    console.log("Request body type:", req.body.type);
-    // Don't log the full body as it might contain sensitive data
+// Register slash commands
+app.command("/chapters-ping", async ({ ack, command, say }) => {
+  try {
+    await ack();
+    await say("Pong! Chapters is up and running!");
+  } catch (error) {
+    console.error("Error handling /chapters-ping command:", error);
   }
-  next();
 });
 
-// Basic home route (optional, but good for health checks)
+// Hello command for testing
+app.command("/hello", async ({ ack, command, say }) => {
+  try {
+    await ack();
+    await say(`Hello <@${command.user_id}>! This is a test slash command.`);
+  } catch (error) {
+    console.error("Error handling /hello command:", error);
+  }
+});
+
+// API health check route
 expressApp.get("/", (req, res) => {
   res.status(200).json({
     status: "ok",
-    message: "Chapters Slack bot is running via ExpressReceiver on Vercel.",
+    message: "Chapters Slack bot API is running",
+    version: process.env.npm_package_version || "unknown",
   });
 });
 
-// GET handlers for all Slack endpoints (for browser testing)
-expressApp.get("/slack/events", (req, res) => {
-  res.status(200).json({
-    status: "ok",
-    message:
-      "This is the Slack events endpoint. Slack will send POST requests here, not GET requests.",
+// Start local server if in development mode
+if (process.env.NODE_ENV === "development") {
+  const port = process.env.PORT || 3000;
+  expressApp.listen(port, () => {
+    console.log(`⚡️ Local development server running on port ${port}`);
+    console.log(`💡 To expose to Slack, use: ngrok http ${port}`);
+    console.log(`🔗 Then update Request URLs in your Slack App config to:`);
+    console.log(`   - Events: https://your-ngrok-url/slack/events`);
+    console.log(`   - Commands: https://your-ngrok-url/slack/commands`);
+    console.log(`   - Interactions: https://your-ngrok-url/slack/interactions`);
   });
-});
+}
 
-expressApp.get("/slack/commands", (req, res) => {
-  res.status(200).json({
-    status: "ok",
-    message:
-      "This is the Slack commands endpoint. Slack will send POST requests here, not GET requests.",
-  });
-});
-
-expressApp.get("/slack/interactions", (req, res) => {
-  res.status(200).json({
-    status: "ok",
-    message:
-      "This is the Slack interactions endpoint. Slack will send POST requests here, not GET requests.",
-  });
-});
-
-// Explicit POST handlers for Slack endpoints
-expressApp.post("/slack/events", async (req, res) => {
-  console.log("Received POST request to /slack/events");
-  try {
-    await receiver.requestHandler(req, res);
-  } catch (error) {
-    console.error("Error handling /slack/events:", error);
-    console.error("Error stack:", error.stack);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-expressApp.post("/slack/commands", async (req, res) => {
-  console.log("Received POST request to /slack/commands");
-  try {
-    // Log the command details (safely)
-    if (req.body) {
-      console.log("Command details:", {
-        command: req.body.command,
-        text: req.body.text,
-        user_id: req.body.user_id,
-        channel_id: req.body.channel_id,
-      });
-    }
-    await receiver.requestHandler(req, res);
-  } catch (error) {
-    console.error("Error handling /slack/commands:", error);
-    console.error("Error stack:", error.stack);
-    // Log the full error details
-    console.error(
-      "Full error details:",
-      JSON.stringify(error, Object.getOwnPropertyNames(error))
-    );
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-expressApp.post("/slack/interactions", async (req, res) => {
-  console.log("Received POST request to /slack/interactions");
-  try {
-    await receiver.requestHandler(req, res);
-  } catch (error) {
-    console.error("Error handling /slack/interactions:", error);
-    console.error("Error stack:", error.stack);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// Export the express app for Vercel
+// Export the Express app for Vercel
 module.exports = expressApp;

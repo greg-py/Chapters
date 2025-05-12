@@ -4,6 +4,7 @@ import { CyclePhase } from "../constants";
 import { capitalizeFirstLetter } from "../utils";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "../db";
+import { WebClient } from "@slack/web-api";
 
 interface PhaseEndTime {
   cycleId: ObjectId;
@@ -24,12 +25,14 @@ interface VoteTally {
 export class PhaseTransitionService {
   private phaseEndTimes: Map<string, PhaseEndTime> = new Map();
   private intervalId: NodeJS.Timeout | null = null;
-  private client: App["client"];
+  private client: WebClient | null = null;
+  private app: App | null = null;
   private checkIntervalMs: number = 60 * 60 * 1000; // Check hourly by default
   private static instance: PhaseTransitionService | null = null;
 
-  constructor(app: App, checkIntervalMinutes: number = 60) {
-    this.client = app.client;
+  constructor(app: App | null, checkIntervalMinutes: number = 60) {
+    this.app = app;
+    this.client = app?.client || null;
 
     // Use a much shorter check interval if in test mode (every 10 seconds)
     if (process.env.TEST_MODE === "true") {
@@ -43,10 +46,19 @@ export class PhaseTransitionService {
   }
 
   /**
+   * Set or update the app instance
+   */
+  public setApp(app: App): void {
+    this.app = app;
+    this.client = app.client;
+    console.log("Updated App instance in PhaseTransitionService");
+  }
+
+  /**
    * Get or create the singleton instance of PhaseTransitionService
    */
   public static getInstance(
-    app: App,
+    app: App | null,
     checkIntervalMinutes: number = 60
   ): PhaseTransitionService {
     if (!PhaseTransitionService.instance) {
@@ -54,6 +66,9 @@ export class PhaseTransitionService {
         app,
         checkIntervalMinutes
       );
+    } else if (app) {
+      // Update the app instance if provided and instance already exists
+      PhaseTransitionService.instance.setApp(app);
     }
     return PhaseTransitionService.instance;
   }
@@ -62,6 +77,11 @@ export class PhaseTransitionService {
    * Start the automatic phase transition service
    */
   public start(): void {
+    if (!this.app || !this.client) {
+      console.warn("Cannot start PhaseTransitionService: App instance not set");
+      return;
+    }
+
     if (this.intervalId !== null) {
       console.log("Phase transition service is already running");
       return;
@@ -406,6 +426,11 @@ export class PhaseTransitionService {
     cycle: Cycle,
     nextPhase: CyclePhase
   ): Promise<void> {
+    if (!this.client) {
+      console.error("Cannot transition phase: client is null");
+      return;
+    }
+
     const currentPhase = cycle.getCurrentPhase();
     const channelId = cycle.getChannelId();
 
@@ -596,6 +621,11 @@ export class PhaseTransitionService {
     newEndTime: Date,
     attempts: number
   ): Promise<void> {
+    if (!this.client) {
+      console.error("Cannot notify extended deadline: client is null");
+      return;
+    }
+
     // In test mode, notify on every attempt. In normal mode, only on 1st, 3rd, 7th day, etc.
     if (
       process.env.TEST_MODE !== "true" &&
@@ -735,6 +765,11 @@ export class PhaseTransitionService {
    * Complete a cycle at the end of the discussion phase
    */
   private async completeCycle(cycle: Cycle): Promise<void> {
+    if (!this.client) {
+      console.error("Cannot complete cycle: client is null");
+      return;
+    }
+
     try {
       const channelId = cycle.getChannelId();
 
