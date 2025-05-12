@@ -129,32 +129,117 @@ If you're using Vercel, follow these steps:
    - Add all required environment variables in the Vercel dashboard (Project Settings > Environment Variables)
    - Add the following variables:
      - `SLACK_APP_BOT_TOKEN`
-     - `SLACK_APP_TOKEN`
+     - `SLACK_APP_TOKEN` (only if using Socket Mode)
      - `SLACK_APP_SIGNING_SECRET`
      - `MONGODB_URI` (use a cloud MongoDB instance like MongoDB Atlas)
      - `NODE_ENV=production`
+     - `USE_SOCKET_MODE=false` (to use HTTP mode instead of Socket Mode)
 
 3. **Deploy the App**
 
    - Using Vercel CLI: Run `vercel` in the project root
    - Or use the Vercel dashboard and connect your GitHub repository
 
-4. **Enable Socket Mode for Slack**
+4. **Configure Slack App for HTTP Mode**
 
-   - Ensure your Slack app has Socket Mode enabled in the Slack App configuration page
-   - With Socket Mode, you don't need to specify a Request URL in your Slack app configuration
-   - Make sure your SLACK_APP_TOKEN has the `connections:write` scope
+   When using HTTP mode (`USE_SOCKET_MODE=false`), you need to configure your Slack app with Request URLs:
 
-5. **Verify the Deployment**
+   1. **Disable Socket Mode** in your Slack app configuration
 
-   - Open your Vercel deployment URL (e.g., https://your-app-name.vercel.app/) to verify the app has deployed
-   - You should see a JSON response indicating the app is running
+   2. **Set the Request URLs** in your Slack app dashboard:
+
+      - **Event Subscriptions**: Set URL to `https://your-app-name.vercel.app/slack/events`
+      - **Interactivity & Shortcuts**: Set URL to `https://your-app-name.vercel.app/slack/interactions`
+      - **Slash Commands**: For each command, set URL to `https://your-app-name.vercel.app/slack/commands`
+
+   3. **Subscribe to Bot Events** under Event Subscriptions:
+      - `app_mention`
+      - Any other events your app needs to handle
+
+5. **Verify Endpoints**
+
+   - Slack will verify your endpoints when you save the configuration
+   - If verification fails, check your Vercel logs for errors
+
+6. **Test the Commands**
    - Use `/chapters-ping` in Slack to test if your bot is responding
 
-6. **Troubleshooting**
-   - If the bot doesn't respond to commands, check the Vercel logs for errors
-   - Verify that all environment variables are set correctly
-   - Make sure your MongoDB instance is accessible from Vercel's servers
-   - Check that your Slack app has all required scopes and permissions
+## Socket Mode vs HTTP Mode
 
-Remember that Vercel functions run serverless, so there's no persistent server to maintain. The app will initialize when the API endpoint is first accessed, establishing the Socket Mode connection with Slack.
+This application supports two modes of operation:
+
+### Socket Mode (Recommended for Development)
+
+- Uses a WebSocket connection to Slack
+- Doesn't require public URLs
+- Requires an App-Level Token (`SLACK_APP_TOKEN`)
+- Set `USE_SOCKET_MODE=true` in your environment
+
+### HTTP Mode (Recommended for Production)
+
+- Uses HTTP endpoints that Slack sends requests to
+- Requires public URLs for your endpoints
+- More reliable for production use
+- Set `USE_SOCKET_MODE=false` in your environment
+- Configure Request URLs in your Slack app settings
+
+## Vercel HTTP Mode Configuration
+
+When using HTTP mode with Vercel, follow these steps:
+
+1. In the Vercel dashboard, set the environment variable `USE_SOCKET_MODE=false`
+
+2. In your Slack app settings (https://api.slack.com/apps):
+
+   a. **Disable Socket Mode**:
+
+   - Go to "Socket Mode" and turn it off
+
+   b. **Configure Event Subscriptions**:
+
+   - Enable Events
+   - Set the Request URL to `https://your-app-name.vercel.app/slack/events`
+   - Under "Subscribe to bot events", add `app_mention` and any other events you need
+   - Save changes
+
+   c. **Configure Interactivity & Shortcuts**:
+
+   - Enable Interactivity
+   - Set the Request URL to `https://your-app-name.vercel.app/slack/interactions`
+   - Save changes
+
+   d. **Configure Slash Commands**:
+
+   - For each command (e.g., `/chapters-ping`), set the Request URL to `https://your-app-name.vercel.app/slack/commands`
+
+3. Redeploy your app to Vercel if needed
+
+4. Test by using `/chapters-ping` in a Slack channel where the app is installed
+
+## Troubleshooting HTTP Mode
+
+If your Slack app isn't responding in HTTP mode:
+
+1. **Check URL Verification**
+
+   - When you set the Request URL, Slack sends a challenge to verify ownership
+   - The app should automatically respond to this challenge
+   - Check Vercel logs for any errors during this verification
+
+2. **Verify Environment Variables**
+   - Ensure `USE_SOCKET_MODE` is set to `false`
+   - Verify all other required environment variables are set
+3. **Check Vercel Logs**
+
+   - Look for any initialization errors
+   - Check if the middleware is being created successfully
+
+4. **Test Endpoints Manually**
+   - Visit `https://your-app-name.vercel.app/` to see if the app is running
+   - You should see a JSON response with status "ok"
+5. **Verify Slack App Settings**
+   - Ensure Socket Mode is disabled
+   - Check that all request URLs are correctly set
+   - Verify the app has all required scopes and permissions
+
+If issues persist, try redeploying the app or check the Slack Developer documentation for more troubleshooting tips.

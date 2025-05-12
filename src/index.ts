@@ -14,10 +14,14 @@ const requiredEnvVars = [
     name: "SLACK_APP_BOT_TOKEN",
     description: "Bot User OAuth Token (starts with xoxb-)",
   },
-  {
-    name: "SLACK_APP_TOKEN",
-    description: "App-Level Token (starts with xapp-)",
-  },
+  ...(process.env.USE_SOCKET_MODE === "true"
+    ? [
+        {
+          name: "SLACK_APP_TOKEN",
+          description: "App-Level Token (starts with xapp-)",
+        },
+      ]
+    : []),
   {
     name: "SLACK_APP_SIGNING_SECRET",
     description: "Signing Secret from Basic Information",
@@ -38,12 +42,16 @@ if (missingVars.length > 0) {
   process.exit(1);
 }
 
-// Initialize Slack app with production-ready settings
+// Determine if we should use Socket Mode based on environment variable
+const useSocketMode = process.env.USE_SOCKET_MODE === "true";
+
+// Initialize Slack app with appropriate settings based on mode
 const app = new App({
   token: process.env.SLACK_APP_BOT_TOKEN,
   signingSecret: process.env.SLACK_APP_SIGNING_SECRET,
-  socketMode: true,
-  appToken: process.env.SLACK_APP_TOKEN,
+  // Only use Socket Mode if explicitly enabled
+  socketMode: useSocketMode,
+  ...(useSocketMode ? { appToken: process.env.SLACK_APP_TOKEN } : {}),
   // For production, explicitly set additional security options
   logLevel:
     process.env.NODE_ENV === "production" ? LogLevel.ERROR : LogLevel.INFO,
@@ -80,27 +88,45 @@ process.on("unhandledRejection", (reason, promise) => {
   // Note: We don't exit the process here since it could be recoverable
 });
 
-// Start the app
-(async () => {
-  try {
-    // Connect to database
-    await connectToDatabase();
+// Start the app if not being imported elsewhere
+if (require.main === module) {
+  // Start the app
+  (async () => {
+    try {
+      // Connect to database
+      await connectToDatabase();
 
-    // Start the phase transition service
-    phaseTransitionService.start();
+      // Start the phase transition service
+      phaseTransitionService.start();
 
-    const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-    await app.start(port);
-    console.log(`⚡️ Chapters is running on port ${port}!`);
+      const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-    // Log environment mode for visibility
-    console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-    if (process.env.TEST_MODE === "true") {
-      console.log("⚠️ Running in TEST MODE - not suitable for production!");
+      if (useSocketMode) {
+        console.log("⚡️ Starting Chapters in Socket Mode");
+        await app.start();
+      } else {
+        console.log(`⚡️ Starting Chapters in HTTP mode on port ${port}`);
+        await app.start(port);
+      }
+
+      console.log(
+        `⚡️ Chapters is running ${
+          useSocketMode ? "in Socket Mode" : `on port ${port}`
+        }!`
+      );
+
+      // Log environment mode for visibility
+      console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+      if (process.env.TEST_MODE === "true") {
+        console.log("⚠️ Running in TEST MODE - not suitable for production!");
+      }
+    } catch (error) {
+      console.error("Error starting the app:", error);
+      await closeDatabaseConnection();
+      process.exit(1);
     }
-  } catch (error) {
-    console.error("Error starting the app:", error);
-    await closeDatabaseConnection();
-    process.exit(1);
-  }
-})();
+  })();
+}
+
+// Export the app for use in other modules
+export { app };
