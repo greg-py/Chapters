@@ -80,7 +80,9 @@ export const registerSuggestionActions = (app: App): void => {
       // Post announcement in the channel
       await client.chat.postMessage({
         channel: channelId,
-        text: `:books: A new book has been suggested: *<${url}|${title}>* by ${author}`,
+        text: `:books: A new book has been suggested: *<${url}|${title}>* by ${author}${
+          notes ? `\n\n*Notes:* ${notes}` : ""
+        }`,
       });
     })
   );

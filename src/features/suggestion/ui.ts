@@ -222,8 +222,9 @@ export const sendSuggestionsListUI = async (
     ...suggestionBlocks,
   ];
 
-  await client.chat.postMessage({
+  await client.chat.postEphemeral({
     channel: command.channel_id,
+    user: command.user_id,
     blocks,
     text: "Book Suggestions for Current Cycle",
   });
