@@ -5,7 +5,10 @@
       "src": "package.json",
       "use": "@vercel/node",
       "config": {
-        "buildCommand": "npm run build"
+        "buildCommand": "npm run build",
+        "env": {
+          "APP_VERSION": "1.0.0"
+        }
       }
     },
     {
@@ -22,5 +25,8 @@
   "env": {
     "NODE_ENV": "production",
     "USE_SOCKET_MODE": "false"
+  },
+  "git": {
+    "deploymentEnabled": false
   }
 }
