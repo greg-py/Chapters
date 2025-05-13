@@ -23,12 +23,18 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: "18"
           cache: "npm"
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "github-actions@github.com"
 
       - name: Install dependencies
         run: npm ci
@@ -48,6 +54,11 @@ jobs:
           elif [ "${{ github.event.inputs.release_type }}" = "rc" ]; then
             npm run release:rc
           fi
+
+      - name: Push changes
+        run: |
+          git push origin HEAD:${{ github.ref }}
+          git push --tags
 
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v20
