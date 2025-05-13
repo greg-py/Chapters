@@ -1,0 +1,59 @@
+name: Deploy to Vercel
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Type of release"
+        required: true
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - alpha
+          - beta
+          - rc
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create new version
+        run: |
+          if [ "${{ github.event.inputs.release_type }}" = "patch" ]; then
+            npm run release
+          elif [ "${{ github.event.inputs.release_type }}" = "minor" ]; then
+            npm run release -- --release-as minor
+          elif [ "${{ github.event.inputs.release_type }}" = "major" ]; then
+            npm run release -- --release-as major
+          elif [ "${{ github.event.inputs.release_type }}" = "alpha" ]; then
+            npm run release:alpha
+          elif [ "${{ github.event.inputs.release_type }}" = "beta" ]; then
+            npm run release:beta
+          elif [ "${{ github.event.inputs.release_type }}" = "rc" ]; then
+            npm run release:rc
+          fi
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./
+          vercel-args: "--prod"
