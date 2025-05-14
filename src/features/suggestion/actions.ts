@@ -70,6 +70,15 @@ export const registerSuggestionActions = (app: App): void => {
         notes
       );
 
+      // Delete the suggestion form message
+      const messageTs = blockAction.message?.ts;
+      if (messageTs) {
+        await client.chat.delete({
+          channel: channelId,
+          ts: messageTs,
+        });
+      }
+
       // Send confirmation to user
       await client.chat.postEphemeral({
         channel: channelId,
@@ -89,25 +98,27 @@ export const registerSuggestionActions = (app: App): void => {
 
   // Handler for canceling a book suggestion
   app.action(
-    ActionId.CANCEL_PHASE_CHANGE, // Reusing existing action for cancel
+    ActionId.CANCEL_BOOK_SUGGESTION,
     withActionErrorHandling(async ({ body, client }) => {
       // ack() is called by the wrapper
 
       const blockAction = body as BlockAction;
       const userId = blockAction.user.id;
       const channelId = blockAction.channel?.id;
+      const messageTs = blockAction.message?.ts;
 
       if (!userId || !channelId) {
         console.warn("Cancel suggestion action missing user or channel ID.");
         return;
       }
 
-      // Send an ephemeral message to confirm cancellation
-      await client.chat.postEphemeral({
-        channel: channelId,
-        user: userId,
-        text: "Book suggestion canceled.",
-      });
+      // Delete the suggestion form message
+      if (messageTs) {
+        await client.chat.delete({
+          channel: channelId,
+          ts: messageTs,
+        });
+      }
     })
   );
 };

@@ -19,6 +19,7 @@ export const ActionId = {
 
   // Suggestion Actions
   SUBMIT_BOOK_SUGGESTION: "submit_book_suggestion",
+  CANCEL_BOOK_SUGGESTION: "cancel_book_suggestion",
   FIRST_CHOICE_SELECT: "first_choice_select",
   SECOND_CHOICE_SELECT: "second_choice_select",
   THIRD_CHOICE_SELECT: "third_choice_select",
