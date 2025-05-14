@@ -38,6 +38,8 @@ Here's a complete list of all available commands:
 | `/chapters-vote`             | Vote for your favorite books           | `/chapters-vote`             |
 | `/chapters-voting-results`   | View current voting results            | `/chapters-voting-results`   |
 | `/chapters-complete-cycle`   | Complete and archive the current cycle | `/chapters-complete-cycle`   |
+| `/chapters-version`          | Show current bot version               | `/chapters-version`          |
+| `/chapters-reset-cycle`      | Reset and delete the current cycle     | `/chapters-reset-cycle`      |
 
 ## Detailed Command Descriptions
 
@@ -100,6 +102,25 @@ Shows the current standings in the voting process, with suggestions sorted by to
 **Short Description:** Complete and archive the current cycle  
 **Usage Hint:** `/chapters-complete-cycle`  
 Completes the current book club cycle, archives it, and allows a new cycle to be started. This command can only be used when the cycle is in the discussion phase.
+
+### `/chapters-version`
+
+**Short Description:** Show current bot version  
+**Usage Hint:** `/chapters-version`  
+Displays the current version of the Chapters bot, which is useful for troubleshooting and ensuring you're running the latest version.
+
+### `/chapters-reset-cycle`
+
+**Short Description:** Reset and delete the current cycle  
+**Usage Hint:** `/chapters-reset-cycle`  
+Emergency command that allows administrators to reset and delete the current book club cycle. This will:
+
+- Delete all book suggestions
+- Delete all votes
+- Clear phase transition timers
+- Allow starting a fresh cycle
+
+⚠️ **Warning:** This action cannot be undone and should only be used in emergency situations.
 
 ## Book Club Cycle Lifecycle
 
@@ -166,6 +187,60 @@ Benefits:
 - Ensures consistent error responses
 - Centralizes error logging
 - Makes command handlers more readable
+
+## Development Workflow
+
+### Branching Strategy
+
+1. **Main Branch**: `master` is the main branch and should always be in a deployable state
+2. **Feature Branches**: Create feature branches from `master` using the following naming convention:
+   - `feature/description-of-feature` for new features
+   - `fix/description-of-fix` for bug fixes
+   - `docs/description-of-docs` for documentation changes
+   - `refactor/description-of-refactor` for code refactoring
+
+### Making Changes
+
+1. Create a new branch from `master`:
+
+   ```bash
+   git checkout master
+   git pull origin master
+   git checkout -b feature/your-feature-name
+   ```
+
+2. Make your changes and commit them following the conventional commit format:
+
+   ```
+   type(scope): description
+
+   [optional body]
+
+   [optional footer]
+   ```
+
+   Types include:
+
+   - `feat`: New feature
+   - `fix`: Bug fix
+   - `docs`: Documentation changes
+   - `style`: Code style changes (formatting, etc.)
+   - `refactor`: Code refactoring
+   - `test`: Adding or modifying tests
+   - `chore`: Maintenance tasks
+
+3. Push your branch and create a Pull Request:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+### Pull Request Process
+
+1. Create a Pull Request from your feature branch to `master`
+2. Ensure all CI checks pass
+3. Request review from at least one team member
+4. Address any review comments
+5. Once approved, squash and merge your PR into `master`
 
 ## Local Development
 
