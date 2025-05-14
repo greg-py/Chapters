@@ -119,7 +119,7 @@ export const sendBookSuggestionUI = async (
               text: "Cancel",
               emoji: true,
             },
-            action_id: ActionId.CANCEL_PHASE_CHANGE,
+            action_id: ActionId.CANCEL_BOOK_SUGGESTION,
           },
         ],
       },
