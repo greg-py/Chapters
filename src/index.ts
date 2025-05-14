@@ -26,7 +26,7 @@ process.on("unhandledRejection", (reason, promise) => {
 // This is exported for backwards compatibility
 export const phaseTransitionService = PhaseTransitionService.getInstance(
   null as any, // Will be initialized properly in initializeServices
-  process.env.TEST_MODE === "true" ? 10 : 60 // 10 seconds for test mode, 60 minutes for production
+  process.env.PHASE_TEST_MODE === "true" ? 10 : 60 // 10 seconds for test mode, 60 minutes for production
 );
 
 /**
@@ -158,7 +158,7 @@ export async function startServer(app: App) {
 
     // Log environment mode for visibility
     console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-    if (process.env.TEST_MODE === "true") {
+    if (process.env.PHASE_TEST_MODE === "true") {
       console.log("⚠️ Running in TEST MODE - not suitable for production!");
     }
   } catch (error) {

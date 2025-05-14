@@ -11,9 +11,9 @@ export const DEFAULT_PHASE_DURATIONS = {
 };
 
 // Fast test mode with 1-minute durations for testing phase transitions
-// Enable by setting TEST_MODE=true in your .env file
+// Enable by setting PHASE_TEST_MODE=true in your .env file
 export const getPhaseConfig = () => {
-  const isTestMode = process.env.TEST_MODE === "true";
+  const isTestMode = process.env.PHASE_TEST_MODE === "true";
 
   if (isTestMode) {
     console.log("🧪 TEST MODE ENABLED: All phase durations set to 1 minute");

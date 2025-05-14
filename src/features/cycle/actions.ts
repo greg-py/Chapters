@@ -64,7 +64,7 @@ export const registerCycleActions = (app: App): void => {
       }
 
       // Check if we're in test mode
-      const isTestMode = process.env.TEST_MODE === "true";
+      const isTestMode = process.env.PHASE_TEST_MODE === "true";
 
       // If in test mode, we'll use the getPhaseConfig() function directly instead of form values
       if (isTestMode) {
