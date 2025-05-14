@@ -76,7 +76,7 @@ export const sendCycleConfigurationUI = async (
           type: "plain_text_input",
           action_id: ActionId.SUGGESTION_DAYS_INPUT,
           initial_value:
-            process.env.TEST_MODE === "true"
+            process.env.PHASE_TEST_MODE === "true"
               ? "1 min"
               : getPhaseConfig().suggestion.toString(),
           placeholder: { type: "plain_text", text: "Days" },
@@ -90,7 +90,7 @@ export const sendCycleConfigurationUI = async (
           type: "plain_text_input",
           action_id: ActionId.VOTING_DAYS_INPUT,
           initial_value:
-            process.env.TEST_MODE === "true"
+            process.env.PHASE_TEST_MODE === "true"
               ? "1 min"
               : getPhaseConfig().voting.toString(),
           placeholder: { type: "plain_text", text: "Days" },
@@ -104,7 +104,7 @@ export const sendCycleConfigurationUI = async (
           type: "plain_text_input",
           action_id: ActionId.READING_DAYS_INPUT,
           initial_value:
-            process.env.TEST_MODE === "true"
+            process.env.PHASE_TEST_MODE === "true"
               ? "1 min"
               : getPhaseConfig().reading.toString(),
           placeholder: { type: "plain_text", text: "Days" },
@@ -118,7 +118,7 @@ export const sendCycleConfigurationUI = async (
           type: "plain_text_input",
           action_id: ActionId.DISCUSSION_DAYS_INPUT,
           initial_value:
-            process.env.TEST_MODE === "true"
+            process.env.PHASE_TEST_MODE === "true"
               ? "1 min"
               : getPhaseConfig().discussion.toString(),
           placeholder: { type: "plain_text", text: "Days" },

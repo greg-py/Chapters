@@ -35,7 +35,7 @@ export class PhaseTransitionService {
     this.client = app?.client || null;
 
     // Use a much shorter check interval if in test mode (every 10 seconds)
-    if (process.env.TEST_MODE === "true") {
+    if (process.env.PHASE_TEST_MODE === "true") {
       this.checkIntervalMs = 10 * 1000; // 10 seconds in test mode
       console.log(
         "🧪 TEST MODE: Phase transition checks running every 10 seconds"
@@ -195,7 +195,7 @@ export class PhaseTransitionService {
     });
 
     // In test mode, show the end time in a more readable format
-    if (process.env.TEST_MODE === "true") {
+    if (process.env.PHASE_TEST_MODE === "true") {
       const seconds = Math.round((endTime.getTime() - now.getTime()) / 1000);
       console.log(
         `🧪 TEST MODE: Set phase end time for cycle ${cycle.getId()}, phase ${currentPhase}: ${endTime} (in ${seconds} seconds)`
@@ -553,7 +553,7 @@ export class PhaseTransitionService {
     const duration = phaseDurations[nextPhase as keyof typeof phaseDurations];
 
     // Show "1 minute" in test mode instead of fractional days
-    if (process.env.TEST_MODE === "true") {
+    if (process.env.PHASE_TEST_MODE === "true") {
       announcementMsg += `\n\nThis phase will end in 1 minute.`;
     } else {
       announcementMsg += `\n\nThis phase will end in ${duration} days.`;
@@ -584,7 +584,7 @@ export class PhaseTransitionService {
 
     // Extend by one minute in test mode, otherwise one day
     const extensionMs =
-      process.env.TEST_MODE === "true"
+      process.env.PHASE_TEST_MODE === "true"
         ? 60 * 1000 // 1 minute in test mode
         : 24 * 60 * 60 * 1000; // 1 day in normal mode
 
@@ -607,7 +607,8 @@ export class PhaseTransitionService {
     );
 
     // Log with appropriate time unit
-    const extensionUnit = process.env.TEST_MODE === "true" ? "minute" : "day";
+    const extensionUnit =
+      process.env.PHASE_TEST_MODE === "true" ? "minute" : "day";
     console.log(
       `Extended phase end time for cycle ${cycleId} to ${newEndTime} (by 1 ${extensionUnit})`
     );
@@ -628,7 +629,7 @@ export class PhaseTransitionService {
 
     // In test mode, notify on every attempt. In normal mode, only on 1st, 3rd, 7th day, etc.
     if (
-      process.env.TEST_MODE !== "true" &&
+      process.env.PHASE_TEST_MODE !== "true" &&
       attempts !== 1 &&
       attempts !== 3 &&
       attempts !== 7 &&
@@ -658,7 +659,8 @@ export class PhaseTransitionService {
         cycleData.selectedBookId
       );
 
-      const extensionUnit = process.env.TEST_MODE === "true" ? "minute" : "day";
+      const extensionUnit =
+        process.env.PHASE_TEST_MODE === "true" ? "minute" : "day";
 
       let message = `:clock1: *Book Club Phase Change Delayed*\n\nThe ${capitalizeFirstLetter(
         phaseInfo.phase
@@ -674,7 +676,7 @@ export class PhaseTransitionService {
       message += `\n\nThe phase will now end on ${newEndTime.toLocaleDateString()}`;
 
       // Add more precise time in test mode
-      if (process.env.TEST_MODE === "true") {
+      if (process.env.PHASE_TEST_MODE === "true") {
         message += ` at ${newEndTime.toLocaleTimeString()}`;
       }
 

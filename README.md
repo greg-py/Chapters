@@ -14,13 +14,91 @@ Chapters is a comprehensive Slack bot designed to streamline book club managemen
 - **Automated Phase Transitions**: Phases transition automatically with informative messages at each stage
 - **Phase-Specific Messages**: Each phase includes helpful context like available books during voting, the selected book during reading, and discussion prompts
 
-## Getting Started
+## Development Setup
 
-1. Install the Chapters app to your Slack workspace
-2. Invite the bot to your book club channel
-3. Run `/chapters-start-cycle` to configure the book club and start the first cycle
-4. Follow the natural progression from suggestions → voting → reading → discussion
-5. After the book discussion, use `/chapters-complete-cycle` to archive the cycle and view stats
+### Prerequisites
+
+1. Docker and Docker Compose installed
+2. Node.js 20 or later
+3. A Slack workspace for development
+4. A Slack app configured for development
+
+### Environment Setup
+
+1. Create a `.env` file in the root directory:
+
+   ```
+   # Slack App Credentials
+   SLACK_APP_BOT_TOKEN=xoxb-your-dev-bot-token
+   SLACK_APP_TOKEN=xapp-your-dev-app-token
+   SLACK_APP_SIGNING_SECRET=your-dev-signing-secret
+
+   # MongoDB Configuration (for local development)
+   MONGODB_URI=mongodb://mongodb:27017/chapters
+
+   # Application Configuration
+   NODE_ENV=development
+   USE_SOCKET_MODE=true
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+### Running the Application
+
+#### Normal Development
+
+```bash
+npm run dev
+```
+
+This will:
+
+- Start MongoDB in a Docker container
+- Start the application in development mode with hot reloading
+- Use Socket Mode for Slack communication
+- Mount your local code for live updates
+
+#### Phase Testing Mode
+
+```bash
+npm run dev:phasetest
+```
+
+This will:
+
+- Start a separate MongoDB instance for testing
+- Enable accelerated phase transitions (1-minute phases)
+- Run phase transition checks every 10 seconds
+- Keep test data isolated from development data
+
+#### Other Development Commands
+
+- `npm run dev:build` - Rebuild and start the development environment
+- `npm run dev:down` - Stop the development environment
+- `npm run dev:phasetest:build` - Rebuild and start the phase testing environment
+
+### Development vs Production
+
+The application has two distinct environments:
+
+#### Development Environment
+
+- Uses Docker Compose for local development
+- Runs in Socket Mode (no public URL needed)
+- Uses local MongoDB instance
+- Supports hot reloading
+- Includes phase testing mode for rapid testing
+
+#### Production Environment
+
+- Deployed to Vercel
+- Uses HTTP Mode (requires public URL)
+- Uses MongoDB Atlas or similar cloud database
+- Runs in production mode with optimized settings
+- No phase testing mode available
 
 ## Command Reference
 
@@ -151,7 +229,7 @@ These messages help guide members through each phase of the book club with relev
 
 When testing the phase transition service, it's helpful to use shorter durations than the default days-long phases. The application includes a test mode that sets all phase durations to 1 minute for rapid testing:
 
-1. Add `TEST_MODE=true` to your `.env` file
+1. Add `PHASE_TEST_MODE=true` to your `.env` file
 2. Restart the application
 3. When enabled, you'll see a console message: `🧪 TEST MODE ENABLED: All phase durations set to 1 minute`
 
@@ -358,3 +436,7 @@ Benefits:
 - `src/`: TypeScript source code
 - `dist/`: Compiled JavaScript files
 - `docs/`: Documentation files
+
+## Deployment
+
+See [SETUP.md](SETUP.md) for detailed deployment instructions.

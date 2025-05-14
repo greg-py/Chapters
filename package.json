@@ -6,11 +6,12 @@
   "scripts": {
     "build": "node scripts/update-vercel-config.js && tsc",
     "start": "node dist/index.js",
-    "dev": "nodemon --exec ts-node src/index.ts",
-    "dev:http": "npm run build && cross-env NODE_ENV=development USE_SOCKET_MODE=false nodemon api/index.js",
-    "dev:socket": "cross-env NODE_ENV=development USE_SOCKET_MODE=true ts-node src/index.ts",
+    "dev": "docker-compose up",
+    "dev:build": "docker-compose up --build",
+    "dev:down": "docker-compose down",
+    "dev:phasetest": "docker-compose -f docker-compose.phase-test.yml up",
+    "dev:phasetest:build": "docker-compose -f docker-compose.phase-test.yml up --build",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "db:start": "docker run --rm -d -p 27017:27017 --name chapters-mongodb mongo:latest",
     "vercel-build": "node scripts/update-vercel-config.js && tsc",
     "release": "standard-version",
     "release:alpha": "standard-version --prerelease alpha",
@@ -24,7 +25,7 @@
     "typescript",
     "chapters"
   ],
-  "author": "",
+  "author": "Greg King",
   "license": "ISC",
   "dependencies": {
     "@slack/bolt": "^4.2.1",

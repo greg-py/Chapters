@@ -1,32 +1,38 @@
 # Slack Bot Setup Guide
 
-## Required Environment Variables
+## Development Environment
+
+### Prerequisites
+
+1. Docker and Docker Compose installed
+2. Node.js 20 or later
+3. A Slack workspace for development
+4. A Slack app configured for development
+
+### Required Environment Variables
 
 Create a `.env` file in the root of the project with these required variables:
 
 ```
 # Required Slack API credentials
-SLACK_APP_BOT_TOKEN=xoxb-your-bot-token-here
-SLACK_APP_TOKEN=xapp-your-app-level-token-here
-SLACK_APP_SIGNING_SECRET=your-signing-secret-here
+SLACK_APP_BOT_TOKEN=xoxb-your-dev-bot-token
+SLACK_APP_TOKEN=xapp-your-dev-app-token
+SLACK_APP_SIGNING_SECRET=your-dev-signing-secret
 
-# MongoDB connection
-MONGODB_URI=mongodb://localhost:27017/chapters
+# MongoDB Configuration (for local development)
+MONGODB_URI=mongodb://mongodb:27017/chapters
 
-# App settings
-PORT=3000
-
-# Testing settings
-# Set to 'true' to use 1-minute phase durations for testing and 10-second checks
-# TEST_MODE=true
+# Application Configuration
+NODE_ENV=development
+USE_SOCKET_MODE=true
 ```
 
-## How to Get the Tokens
+### How to Get the Tokens
 
 1. **SLACK_APP_SIGNING_SECRET**
 
-   - This corresponds to `SLACK_APP_SIGNING_SECRET` in your current variables
    - Found in the "Basic Information" section of your Slack app
+   - This is your app's signing secret for request verification
 
 2. **SLACK_APP_BOT_TOKEN**
 
@@ -41,7 +47,7 @@ PORT=3000
    - Create a new token with the `connections:write` scope
    - Copy the generated token
 
-## Slack App Configuration
+### Slack App Configuration
 
 Ensure your Slack app has the following:
 
@@ -69,177 +75,151 @@ Ensure your Slack app has the following:
    - `/chapters-voting-results` - View current voting results
    - `/chapters-complete-cycle` - Complete and archive the current cycle
 
-## MongoDB Setup
-
-1. Install MongoDB locally or use a cloud provider like MongoDB Atlas
-2. Create a database named "chapters"
-3. Update the MONGODB_URI in your .env file with the correct connection string
-
-## Running the Bot
+### Running the Bot
 
 Once configured:
 
-1. Install dependencies: `npm install`
-2. Start MongoDB locally: `npm run db:start` (requires Docker)
-3. Run in development: `npm run dev`
-4. For production: `npm run build` then `npm start`
+1. Install dependencies:
 
-## Testing Phase Transitions
-
-The app includes a test mode for rapid phase transitions:
-
-1. Set `TEST_MODE=true` in your `.env` file
-2. When enabled:
-   - All phase durations are set to 1 minute (instead of days)
-   - Phase transition checks run every 10 seconds (instead of hourly)
-   - Console will display: `🧪 TEST MODE: Phase transition checks running every 10 seconds`
-3. This allows you to test the full lifecycle of a book club cycle in minutes
-
-## Phase Transition Messages
-
-When the app transitions between phases, it sends informative messages with phase-specific context:
-
-- **Voting Phase**: Displays a list of all suggested books available for voting
-- **Reading Phase**: Shows the selected book with details including title, author, and link
-- **Discussion Phase**: Includes congratulatory messages and discussion prompts
-
-## Deploying to Production
-
-For a production environment:
-
-1. Set up a server or cloud service (AWS, Heroku, etc.)
-2. Configure environment variables on your hosting platform
-3. Make sure your MongoDB instance is accessible from your hosting environment
-4. Set up your Slack app's Request URL to point to your deployed instance
-5. Deploy your application using `npm run build` and `npm start`
-
-## Deploying to Vercel
-
-If you're using Vercel, follow these steps:
-
-1. **Install and login to Vercel CLI** (optional)
-
+   ```bash
+   npm install
    ```
+
+2. Start the development environment:
+
+   ```bash
+   npm run dev
+   ```
+
+   This will:
+
+   - Start MongoDB in a Docker container
+   - Start the application in development mode
+   - Enable hot reloading
+   - Use Socket Mode for Slack communication
+
+3. For phase testing (accelerated transitions):
+
+   ```bash
+   npm run dev:phasetest
+   ```
+
+   This will:
+
+   - Start a separate MongoDB instance for testing
+   - Enable 1-minute phase durations
+   - Run phase transition checks every 10 seconds
+   - Keep test data isolated from development data
+
+## Production Environment
+
+### Prerequisites
+
+1. A Vercel account
+2. The Vercel CLI (optional for direct deployments)
+3. A MongoDB Atlas database
+4. A production Slack workspace
+5. A production Slack app
+
+### Environment Setup
+
+1. **MongoDB Atlas Setup**:
+
+   - Create a MongoDB Atlas account
+   - Create a new cluster
+   - Set up database access (user/password)
+   - Set up network access (IP whitelist)
+   - Get your connection string
+
+2. **Production Slack App**:
+   - Create a new Slack app for production
+   - Configure the same scopes and commands as development
+   - Install to your production workspace
+   - Get the production tokens
+
+### Vercel Deployment
+
+1. **Install and login to Vercel CLI** (optional):
+
+   ```bash
    npm install -g vercel
    vercel login
    ```
 
-2. **Configure Environment Variables**
+2. **Configure Environment Variables** in Vercel:
 
-   - Add all required environment variables in the Vercel dashboard (Project Settings > Environment Variables)
-   - Add the following variables:
-     - `SLACK_APP_BOT_TOKEN`
-     - `SLACK_APP_TOKEN` (only if using Socket Mode)
-     - `SLACK_APP_SIGNING_SECRET`
-     - `MONGODB_URI` (use a cloud MongoDB instance like MongoDB Atlas)
-     - `NODE_ENV=production`
-     - `USE_SOCKET_MODE=false` (to use HTTP mode instead of Socket Mode)
+   - `SLACK_APP_BOT_TOKEN`: Your production bot token
+   - `SLACK_APP_SIGNING_SECRET`: Your production signing secret
+   - `MONGODB_URI`: Your MongoDB Atlas connection string
+   - `NODE_ENV`: `production`
+   - `USE_SOCKET_MODE`: `false`
 
-3. **Deploy the App**
+3. **Deploy to Vercel**:
 
-   - Using Vercel CLI: Run `vercel` in the project root
-   - Or use the Vercel dashboard and connect your GitHub repository
+   ```bash
+   vercel --prod
+   ```
 
-4. **Configure Slack App for HTTP Mode**
-
-   When using HTTP mode (`USE_SOCKET_MODE=false`), you need to configure your Slack app with Request URLs:
-
-   1. **Disable Socket Mode** in your Slack app configuration
-
-   2. **Set the Request URLs** in your Slack app dashboard:
-
-      - **Event Subscriptions**: Set URL to `https://your-app-name.vercel.app/slack/events`
-      - **Interactivity & Shortcuts**: Set URL to `https://your-app-name.vercel.app/slack/interactions`
-      - **Slash Commands**: For each command, set URL to `https://your-app-name.vercel.app/slack/commands`
-
-   3. **Subscribe to Bot Events** under Event Subscriptions:
+4. **Configure Slack App for HTTP Mode**:
+   1. Disable Socket Mode in your Slack app configuration
+   2. Set the Request URLs in your Slack app dashboard:
+      - **Event Subscriptions**: `https://your-app-name.vercel.app/slack/events`
+      - **Interactivity & Shortcuts**: `https://your-app-name.vercel.app/slack/interactions`
+      - **Slash Commands**: `https://your-app-name.vercel.app/slack/commands`
+   3. Subscribe to Bot Events under Event Subscriptions:
       - `app_mention`
       - Any other events your app needs to handle
 
-5. **Verify Endpoints**
+### Production vs Development Differences
 
-   - Slack will verify your endpoints when you save the configuration
-   - If verification fails, check your Vercel logs for errors
+1. **Environment**:
 
-6. **Test the Commands**
-   - Use `/chapters-ping` in Slack to test if your bot is responding
+   - Development: Local Docker environment with hot reloading
+   - Production: Vercel serverless functions
 
-## Socket Mode vs HTTP Mode
+2. **Database**:
 
-This application supports two modes of operation:
+   - Development: Local MongoDB in Docker
+   - Production: MongoDB Atlas
 
-### Socket Mode (Recommended for Development)
+3. **Slack Communication**:
 
-- Uses a WebSocket connection to Slack
-- Doesn't require public URLs
-- Requires an App-Level Token (`SLACK_APP_TOKEN`)
-- Set `USE_SOCKET_MODE=true` in your environment
+   - Development: Socket Mode (no public URL needed)
+   - Production: HTTP Mode (requires public URL)
 
-### HTTP Mode (Recommended for Production)
+4. **Performance**:
 
-- Uses HTTP endpoints that Slack sends requests to
-- Requires public URLs for your endpoints
-- More reliable for production use
-- Set `USE_SOCKET_MODE=false` in your environment
-- Configure Request URLs in your Slack app settings
+   - Development: Optimized for development experience
+   - Production: Optimized for performance and reliability
 
-## Vercel HTTP Mode Configuration
+5. **Testing**:
+   - Development: Includes phase testing mode
+   - Production: No testing modes available
 
-When using HTTP mode with Vercel, follow these steps:
+## Troubleshooting
 
-1. In the Vercel dashboard, set the environment variable `USE_SOCKET_MODE=false`
+### Development Environment
 
-2. In your Slack app settings (https://api.slack.com/apps):
+1. **MongoDB Connection Issues**:
 
-   a. **Disable Socket Mode**:
+   - Ensure Docker is running
+   - Check if MongoDB container is running: `docker ps`
+   - Verify MongoDB URI in `.env`
 
-   - Go to "Socket Mode" and turn it off
+2. **Slack App Issues**:
+   - Verify all tokens are correct
+   - Check Socket Mode is enabled for development
+   - Ensure app is installed to workspace
 
-   b. **Configure Event Subscriptions**:
+### Production Environment
 
-   - Enable Events
-   - Set the Request URL to `https://your-app-name.vercel.app/slack/events`
-   - Under "Subscribe to bot events", add `app_mention` and any other events you need
-   - Save changes
+1. **Vercel Deployment Issues**:
 
-   c. **Configure Interactivity & Shortcuts**:
+   - Check Vercel logs for errors
+   - Verify all environment variables are set
+   - Ensure MongoDB Atlas connection is working
 
-   - Enable Interactivity
-   - Set the Request URL to `https://your-app-name.vercel.app/slack/interactions`
-   - Save changes
-
-   d. **Configure Slash Commands**:
-
-   - For each command (e.g., `/chapters-ping`), set the Request URL to `https://your-app-name.vercel.app/slack/commands`
-
-3. Redeploy your app to Vercel if needed
-
-4. Test by using `/chapters-ping` in a Slack channel where the app is installed
-
-## Troubleshooting HTTP Mode
-
-If your Slack app isn't responding in HTTP mode:
-
-1. **Check URL Verification**
-
-   - When you set the Request URL, Slack sends a challenge to verify ownership
-   - The app should automatically respond to this challenge
-   - Check Vercel logs for any errors during this verification
-
-2. **Verify Environment Variables**
-   - Ensure `USE_SOCKET_MODE` is set to `false`
-   - Verify all other required environment variables are set
-3. **Check Vercel Logs**
-
-   - Look for any initialization errors
-   - Check if the middleware is being created successfully
-
-4. **Test Endpoints Manually**
-   - Visit `https://your-app-name.vercel.app/` to see if the app is running
-   - You should see a JSON response with status "ok"
-5. **Verify Slack App Settings**
-   - Ensure Socket Mode is disabled
-   - Check that all request URLs are correctly set
-   - Verify the app has all required scopes and permissions
-
-If issues persist, try redeploying the app or check the Slack Developer documentation for more troubleshooting tips.
+2. **Slack Integration Issues**:
+   - Verify Request URLs are correct
+   - Check if Socket Mode is disabled
+   - Ensure all required scopes are enabled
