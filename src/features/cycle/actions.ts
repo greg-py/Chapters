@@ -15,7 +15,7 @@ export const registerCycleActions = (app: App): void => {
   // FORM SUBMISSION: Handler for new book club cycle configuration
   app.action(
     ActionId.SUBMIT_CYCLE_CONFIG,
-    withActionErrorHandling(async ({ body, client }) => {
+    withActionErrorHandling(async ({ body, client, respond }) => {
       // ack() is called by the wrapper
 
       const blockAction = body as BlockAction;
@@ -81,11 +81,10 @@ export const registerCycleActions = (app: App): void => {
         // Notify the phase transition service about the updated cycle
         phaseTransitionService.onCycleUpdated(updatedCycle);
 
-        // Post confirmation message to user with test mode warning
-        await client.chat.postEphemeral({
-          channel: channelId,
-          user: userId,
+        // Post confirmation message to user by replacing the original message
+        await respond({
           text: `✅ Book club cycle "${updatedCycle.getName()}" configured successfully with 🧪 TEST MODE (1 minute phases) and moved to the suggestion phase! Members can now suggest books using the \`/chapters-suggest-book\` command.`,
+          replace_original: true,
         });
 
         // Post announcement in the channel
@@ -130,11 +129,10 @@ export const registerCycleActions = (app: App): void => {
       // Notify the phase transition service about the updated cycle
       phaseTransitionService.onCycleUpdated(updatedCycle);
 
-      // Post confirmation message to user
-      await client.chat.postEphemeral({
-        channel: channelId,
-        user: userId,
+      // Post confirmation message to user by replacing the original message
+      await respond({
         text: `✅ Book club cycle "${updatedCycle.getName()}" configured successfully and moved to the suggestion phase! Members can now suggest books using the \`/chapters-suggest-book\` command.`,
+        replace_original: true,
       });
 
       // Post announcement in the channel
@@ -156,7 +154,7 @@ export const registerCycleActions = (app: App): void => {
   // Handler for confirming phase change
   app.action(
     ActionId.CONFIRM_PHASE_CHANGE,
-    withActionErrorHandling(async ({ body, client }) => {
+    withActionErrorHandling(async ({ body, client, respond }) => {
       // ack() is called by the wrapper
 
       const blockAction = body as BlockAction;
@@ -176,11 +174,9 @@ export const registerCycleActions = (app: App): void => {
           ?.selected_option?.value;
 
       if (!selectedPhaseValue) {
-        // This is user error, not system error - post ephemeral directly
-        await client.chat.postEphemeral({
-          channel: channelId,
-          user: userId,
+        await respond({
           text: "⚠️ Please select a phase before confirming.",
+          replace_original: true,
         });
         return; // Don't throw, just inform user
       }
@@ -188,6 +184,9 @@ export const registerCycleActions = (app: App): void => {
       const selectedPhase = selectedPhaseValue as CyclePhase;
       if (!Object.values(CyclePhase).includes(selectedPhase)) {
         // This indicates a potential issue with the UI options vs Enum
+        // For system errors like this, replacing the original message might be confusing if it's an input form.
+        // Throwing an error will be caught by withActionErrorHandling, which sends a new ephemeral error.
+        // This is acceptable as it's an unexpected system state.
         throw new Error(`Invalid phase value selected: ${selectedPhaseValue}`);
       }
 
@@ -202,14 +201,13 @@ export const registerCycleActions = (app: App): void => {
         selectedPhase !== CyclePhase.SUGGESTION &&
         suggestions.length < 3
       ) {
-        await client.chat.postEphemeral({
-          channel: channelId,
-          user: userId,
+        await respond({
           text: `⚠️ At least 3 book suggestions are required before moving to the ${capitalizeFirstLetter(
             selectedPhase
           )} phase. Currently have ${suggestions.length} suggestion${
             suggestions.length === 1 ? "" : "s"
           }.`,
+          replace_original: true,
         });
         return;
       }
@@ -226,12 +224,11 @@ export const registerCycleActions = (app: App): void => {
           // Check if there are any votes at all
           const hasAnyVotes = suggestions.some((s) => s.getTotalPoints() > 0);
           if (!hasAnyVotes) {
-            await client.chat.postEphemeral({
-              channel: channelId,
-              user: userId,
+            await respond({
               text: `⚠️ No votes have been cast yet. Members need to vote using \`/chapters-vote\` before moving to the ${capitalizeFirstLetter(
                 selectedPhase
               )} phase.`,
+              replace_original: true,
             });
             return;
           }
@@ -242,6 +239,10 @@ export const registerCycleActions = (app: App): void => {
           )[0];
 
           // Confirm with the user that we'll select this book
+          // This posts a NEW ephemeral message with its own buttons.
+          // So, no replace_original: true here. The original phase selection UI remains.
+          // Actions from THIS new message (SELECT_BOOK_AND_CHANGE_PHASE, CANCEL_PHASE_CHANGE)
+          // have already been updated to use respond({replace_original: true}) for THEIR ephemeral message.
           await client.chat.postEphemeral({
             channel: channelId,
             user: userId,
@@ -250,7 +251,7 @@ export const registerCycleActions = (app: App): void => {
                 type: "section",
                 text: {
                   type: "mrkdwn",
-                  text: `Based on voting results, *"${winner.getBookName()}"* by *${winner.getAuthor()}* will be selected as the book for this cycle.`,
+                  text: `Based on voting results, *\"${winner.getBookName()}\"* by *${winner.getAuthor()}* will be selected as the book for this cycle.`,
                 },
               },
               {
@@ -283,17 +284,16 @@ export const registerCycleActions = (app: App): void => {
                 ],
               },
             ],
-            text: `Confirm book selection: "${winner.getBookName()}" by ${winner.getAuthor()}`,
+            text: `Confirm book selection: \"${winner.getBookName()}\" by ${winner.getAuthor()}`,
           });
           return;
         } else {
           // Not coming from voting phase - need to select a book first
-          await client.chat.postEphemeral({
-            channel: channelId,
-            user: userId,
+          await respond({
             text: `⚠️ A book must be selected before moving to the ${capitalizeFirstLetter(
               selectedPhase
             )} phase. Complete the voting process first.`,
+            replace_original: true,
           });
           return;
         }
@@ -338,10 +338,9 @@ export const registerCycleActions = (app: App): void => {
       phaseTransitionService.onCycleUpdated(updatedCycle);
 
       // Send confirmation to the user
-      await client.chat.postEphemeral({
-        channel: channelId,
-        user: userId,
+      await respond({
         text: confirmationMsg,
+        replace_original: true,
       });
 
       // Get phase duration for the announcement
@@ -382,7 +381,7 @@ export const registerCycleActions = (app: App): void => {
   // Handler for selecting book & changing phase in one action
   app.action(
     ActionId.SELECT_BOOK_AND_CHANGE_PHASE,
-    withActionErrorHandling(async ({ body, client, action }) => {
+    withActionErrorHandling(async ({ body, client, action, respond }) => {
       const blockAction = body as BlockAction;
       const userId = blockAction.user.id;
       const channelId = blockAction.channel?.id;
@@ -413,16 +412,15 @@ export const registerCycleActions = (app: App): void => {
         throw new Error("Selected book not found. Please try again.");
       }
 
-      // Post confirmation message to the user
-      await client.chat.postEphemeral({
-        channel: channelId,
-        user: userId,
+      // Post confirmation message to the user, replacing the current message
+      await respond({
         text: `✅ The book club cycle has been moved to the ${capitalizeFirstLetter(
           selectedPhase
         )} phase with "${selectedBook.getBookName()}" by ${selectedBook.getAuthor()} selected as the book.`,
+        replace_original: true,
       });
 
-      // Post announcement in the channel
+      // Post announcement in the channel (remains a new message)
       const phaseDurations = updatedCycle.getPhaseDurations();
       const duration =
         selectedPhase !== CyclePhase.PENDING
@@ -444,7 +442,7 @@ export const registerCycleActions = (app: App): void => {
   // Handler for canceling phase change
   app.action(
     ActionId.CANCEL_PHASE_CHANGE,
-    withActionErrorHandling(async ({ body, client }) => {
+    withActionErrorHandling(async ({ body, client, respond }) => {
       // ack() is called by the wrapper
 
       const blockAction = body as BlockAction;
@@ -453,14 +451,14 @@ export const registerCycleActions = (app: App): void => {
 
       if (!userId || !channelId) {
         console.warn("Cancel phase change action missing user or channel ID.");
+        // Original message will time out or stay.
         return;
       }
 
-      // Send an ephemeral message to confirm cancellation
-      await client.chat.postEphemeral({
-        channel: channelId,
-        user: userId,
+      // Send an ephemeral message to confirm cancellation, replacing the original
+      await respond({
         text: "Phase change canceled.",
+        replace_original: true,
       });
     })
   );
@@ -468,7 +466,7 @@ export const registerCycleActions = (app: App): void => {
   // Handler for confirming cycle reset
   app.action(
     ActionId.CONFIRM_CYCLE_RESET,
-    withActionErrorHandling(async ({ body, client }) => {
+    withActionErrorHandling(async ({ body, client, respond }) => {
       // ack() is called by the wrapper
 
       const blockAction = body as BlockAction;
@@ -477,6 +475,10 @@ export const registerCycleActions = (app: App): void => {
 
       if (!userId || !channelId) {
         console.warn("Confirm cycle reset action missing user or channel ID.");
+        // It's tricky to use respond() here if we don't have channel/user,
+        // as the original message might not be clear.
+        // For now, if this happens, the original message will just time out or stay.
+        // A better solution might involve a generic error message via respond if possible.
         return;
       }
 
@@ -501,27 +503,39 @@ export const registerCycleActions = (app: App): void => {
         // Delete the cycle itself
         await db.collection("cycles").deleteOne({ id: cycleId });
 
-        // Send a confirmation message to the user
-        await client.chat.postEphemeral({
-          channel: channelId,
-          user: userId,
-          text: `✅ Book club cycle "${cycleName}" has been completely reset. All data has been deleted. Use \`/chapters-start-cycle\` to start a new cycle.`,
+        // Send a confirmation message to the user by replacing the original message
+        await respond({
+          text: `✅ Book club cycle "${cycleName}" has been completely reset. All data has been deleted.`,
+          replace_original: true,
         });
 
-        // Post announcement in the channel
+        // Post announcement in the channel (this remains as a new message)
         await client.chat.postMessage({
           channel: channelId,
           text: `:recycle: *Book Club Cycle Reset*\n\nThe book club cycle "${cycleName}" has been reset and all data has been deleted.\n\nTo start a new book club cycle, use the \`/chapters-start-cycle\` command.`,
         });
       } catch (error) {
         console.error("Error resetting cycle:", error);
-        await client.chat.postEphemeral({
-          channel: channelId,
-          user: userId,
-          text: `❌ Error resetting book club cycle: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
-        });
+        // Try to respond with an error, replacing the original message
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        try {
+          await respond({
+            text: `❌ Error resetting book club cycle: ${errorMessage}`,
+            replace_original: true,
+          });
+        } catch (respondError) {
+          console.error(
+            "Failed to send error response via respond:",
+            respondError
+          );
+          // Fallback to posting a new ephemeral if respond fails
+          await client.chat.postEphemeral({
+            channel: channelId, // Ensure channelId is available here
+            user: userId, // Ensure userId is available here
+            text: `❌ Error resetting book club cycle: ${errorMessage}. Please try again.`,
+          });
+        }
       }
     })
   );
@@ -529,7 +543,7 @@ export const registerCycleActions = (app: App): void => {
   // Handler for canceling cycle reset
   app.action(
     ActionId.CANCEL_CYCLE_RESET,
-    withActionErrorHandling(async ({ body, client }) => {
+    withActionErrorHandling(async ({ body, respond }) => {
       // ack() is called by the wrapper
 
       const blockAction = body as BlockAction;
@@ -538,15 +552,90 @@ export const registerCycleActions = (app: App): void => {
 
       if (!userId || !channelId) {
         console.warn("Cancel cycle reset action missing user or channel ID.");
+        // Similar to above, if this happens, the original message might just time out.
         return;
       }
 
-      // Send an ephemeral message to confirm cancellation
-      await client.chat.postEphemeral({
-        channel: channelId,
-        user: userId,
+      // Send a confirmation message to the user by replacing the original message
+      await respond({
         text: "Cycle reset canceled. No changes were made.",
+        replace_original: true,
       });
+    })
+  );
+
+  app.action(
+    ActionId.CANCEL_CYCLE_CONFIG,
+    withActionErrorHandling(async ({ body, respond, client }) => {
+      // ack() is called by the wrapper
+
+      const blockAction = body as BlockAction;
+      // Extract userId and channelId for potential logging or future use
+      const userId = blockAction.user.id;
+      const channelId = blockAction.channel?.id;
+
+      if (!userId || !channelId) {
+        console.warn(
+          "Cancel cycle configuration action missing user or channel ID."
+        );
+        return;
+      }
+
+      try {
+        // Get the active cycle
+        const cycle = await validateActiveCycleExists(channelId);
+        const cycleId = cycle.getId();
+        const cycleName = cycle.getName(); // Get name for the message
+
+        // Remove the cycle from phase transition service tracking
+        // This is important because the cycle was registered when /chapters-start-cycle was called
+        phaseTransitionService.onCycleCompleted(channelId);
+
+        // Get database connection
+        const db = await connectToDatabase();
+
+        // Delete any suggestions for this cycle (though unlikely at this stage)
+        await db.collection("suggestions").deleteMany({ cycleId: cycleId });
+
+        // Delete any votes for this cycle (also unlikely)
+        await db.collection("votes").deleteMany({ cycleId: cycleId });
+
+        // Delete the cycle itself
+        await db.collection("cycles").deleteOne({ id: cycleId });
+
+        await respond({
+          text: `Cycle configuration canceled. The provisional cycle "${cycleName}" has been deleted. The form has been dismissed.`,
+          replace_original: true,
+        });
+      } catch (error) {
+        console.error(
+          "Error canceling cycle configuration and deleting cycle:",
+          error
+        );
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        // Try to respond with an error, replacing the original message
+        try {
+          await respond({
+            text: `❌ Error canceling cycle configuration: ${errorMessage}`,
+            replace_original: true,
+          });
+        } catch (respondError) {
+          console.error(
+            "Failed to send error response via respond:",
+            respondError
+          );
+          // Fallback to posting a new ephemeral if respond fails (client might be needed here if not available)
+          if (client) {
+            // Check if client is available from context
+            await client.chat.postEphemeral({
+              channel: channelId,
+              user: userId,
+              text: `❌ Error canceling cycle configuration: ${errorMessage}. The cycle may not have been deleted. Please try again or use the \`/chapters-reset-cycle\` command to start from scratch.`,
+            });
+          }
+        }
+      }
     })
   );
 };

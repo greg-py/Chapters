@@ -5,7 +5,6 @@ import {
   validateActiveCycleExists,
   validateVotingPrerequisites,
 } from "../../validators";
-import { sendVoteConfirmationMessage } from "./ui";
 import { Vote } from "../../services";
 
 /**
@@ -16,7 +15,7 @@ export const registerVoteActions = (app: App): void => {
   // Submit vote handler
   app.action(
     ActionId.SUBMIT_VOTE,
-    withActionErrorHandling(async ({ body, client }) => {
+    withActionErrorHandling(async ({ body, client, respond }) => {
       // ack() is called by the wrapper
 
       const blockAction = body as BlockAction;
@@ -74,11 +73,10 @@ export const registerVoteActions = (app: App): void => {
         thirdChoice: thirdChoiceId,
       });
 
-      // Send confirmation to the user
-      await sendVoteConfirmationMessage(client, channelId, userId, {
-        firstChoice: firstChoiceId,
-        secondChoice: secondChoiceId,
-        thirdChoice: thirdChoiceId,
+      // Send confirmation to the user by replacing the original message
+      await respond({
+        text: "✅ Your vote has been recorded successfully! Thank you for participating.",
+        replace_original: true,
       });
     })
   );
@@ -102,6 +100,31 @@ export const registerVoteActions = (app: App): void => {
     ActionId.THIRD_CHOICE_SELECT,
     withActionErrorHandling(async () => {
       // Just acknowledge the action, no additional handler needed
+    })
+  );
+
+  app.action(
+    ActionId.CANCEL_VOTE,
+    withActionErrorHandling(async ({ body, respond }) => {
+      // ack() is called by the wrapper
+
+      const blockAction = body as BlockAction;
+      // Extract userId and channelId for potential logging or future use, though not strictly needed for respond()
+      const userId = blockAction.user.id;
+      const channelId = blockAction.channel?.id;
+
+      if (!userId || !channelId) {
+        // Check for robustness, though respond() doesn't require them explicitly
+        console.warn("Cancel vote action missing user or channel ID.");
+        // If this happens, the original message might just time out or stay.
+        // No explicit error message sent back to avoid complexity if respond itself fails without context.
+        return;
+      }
+
+      await respond({
+        text: "Voting canceled. The form has been dismissed.",
+        replace_original: true,
+      });
     })
   );
 };

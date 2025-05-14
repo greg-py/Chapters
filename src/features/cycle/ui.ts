@@ -138,6 +138,15 @@ export const sendCycleConfigurationUI = async (
             style: "primary",
             action_id: ActionId.SUBMIT_CYCLE_CONFIG,
           },
+          {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "Cancel",
+              emoji: true,
+            },
+            action_id: ActionId.CANCEL_CYCLE_CONFIG,
+          },
         ],
       },
     ],

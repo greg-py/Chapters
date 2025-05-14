@@ -10,6 +10,7 @@ export enum CyclePhase {
 export const ActionId = {
   // Cycle Actions
   SUBMIT_CYCLE_CONFIG: "submit_cycle_config",
+  CANCEL_CYCLE_CONFIG: "cancel_cycle_config",
   SELECT_PHASE: "select_phase",
   CONFIRM_PHASE_CHANGE: "confirm_phase_change",
   CANCEL_PHASE_CHANGE: "cancel_phase_change",
