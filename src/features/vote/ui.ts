@@ -149,6 +149,15 @@ export const sendVoteUI = async (
             style: "primary",
             action_id: ActionId.SUBMIT_VOTE,
           },
+          {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "Cancel",
+              emoji: true,
+            },
+            action_id: ActionId.CANCEL_VOTE,
+          },
         ],
       },
     ],
@@ -240,22 +249,5 @@ export const sendVotingResultsUI = async (
     channel: command.channel_id,
     blocks,
     text: "Voting Results for Book Club Cycle",
-  });
-};
-
-export const sendVoteConfirmationMessage = async (
-  client: App["client"],
-  channelId: string,
-  userId: string,
-  selections: {
-    firstChoice?: string;
-    secondChoice?: string;
-    thirdChoice?: string;
-  }
-): Promise<void> => {
-  await client.chat.postEphemeral({
-    channel: channelId,
-    user: userId,
-    text: "✅ Your vote has been recorded successfully! Thank you for participating.",
   });
 };

@@ -15,7 +15,7 @@ export const registerSuggestionActions = (app: App): void => {
   // Handler for submitting a book suggestion
   app.action(
     ActionId.SUBMIT_BOOK_SUGGESTION,
-    withActionErrorHandling(async ({ body, client }) => {
+    withActionErrorHandling(async ({ body, client, respond }) => {
       // ack() is called by the wrapper
 
       // Extract values and validate
@@ -70,20 +70,10 @@ export const registerSuggestionActions = (app: App): void => {
         notes
       );
 
-      // Delete the suggestion form message
-      const messageTs = blockAction.message?.ts;
-      if (messageTs) {
-        await client.chat.delete({
-          channel: channelId,
-          ts: messageTs,
-        });
-      }
-
-      // Send confirmation to user
-      await client.chat.postEphemeral({
-        channel: channelId,
-        user: userId,
+      // Send confirmation to user by replacing the original message
+      await respond({
         text: `✅ Your suggestion "${title}" by ${author} has been added to the book club cycle!`,
+        replace_original: true,
       });
 
       // Post announcement in the channel
@@ -99,26 +89,23 @@ export const registerSuggestionActions = (app: App): void => {
   // Handler for canceling a book suggestion
   app.action(
     ActionId.CANCEL_BOOK_SUGGESTION,
-    withActionErrorHandling(async ({ body, client }) => {
+    withActionErrorHandling(async ({ body, respond }) => {
       // ack() is called by the wrapper
 
       const blockAction = body as BlockAction;
       const userId = blockAction.user.id;
       const channelId = blockAction.channel?.id;
-      const messageTs = blockAction.message?.ts;
 
       if (!userId || !channelId) {
         console.warn("Cancel suggestion action missing user or channel ID.");
         return;
       }
 
-      // Delete the suggestion form message
-      if (messageTs) {
-        await client.chat.delete({
-          channel: channelId,
-          ts: messageTs,
-        });
-      }
+      // Replace the original suggestion form with a cancellation message
+      await respond({
+        text: "Book suggestion canceled. The form has been dismissed.",
+        replace_original: true,
+      });
     })
   );
 };
