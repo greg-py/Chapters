@@ -75,7 +75,7 @@ export class Vote {
     // Create a batch update operation for all suggestions in the cycle
     const resetPromises = suggestions.map((suggestion) =>
       updateSuggestion(db, {
-        id: suggestion.getId(),
+        _id: suggestion.getId(),
         totalPoints: 0,
         voters: [],
       })

@@ -1,8 +1,9 @@
-import type { Db } from "mongodb";
+import type { Db, ObjectId } from "mongodb";
 import type { TCycle } from "../models";
+import { COLLECTIONS } from "../db/constants";
 
 export const getActiveCycleInChannel = async (db: Db, channelId: string) => {
-  const cycle = await db.collection("cycles").findOne({
+  const cycle = await db.collection(COLLECTIONS.CYCLES).findOne({
     channelId,
     status: "active",
   });
@@ -10,7 +11,7 @@ export const getActiveCycleInChannel = async (db: Db, channelId: string) => {
 };
 
 export const createCycle = async (db: Db, cycle: TCycle) => {
-  const response = await db.collection("cycles").insertOne(cycle);
+  const response = await db.collection(COLLECTIONS.CYCLES).insertOne(cycle);
 
   return response.insertedId;
 };
@@ -34,13 +35,20 @@ export const updateCycle = async (db: Db, cycle: Partial<TCycle>) => {
     updateOperation.$unset = { selectedBookId: 1 };
   }
 
-  const response = await db.collection("cycles").updateOne(
+  const response = await db.collection(COLLECTIONS.CYCLES).updateOne(
     {
-      id: cycle.id,
+      _id: cycle._id,
       channelId: cycle.channelId,
       status: "active",
     },
     updateOperation
   );
   return response.modifiedCount;
+};
+
+export const deleteCycleById = async (db: Db, id: ObjectId) => {
+  const response = await db
+    .collection(COLLECTIONS.CYCLES)
+    .deleteOne({ _id: id });
+  return response.deletedCount;
 };
