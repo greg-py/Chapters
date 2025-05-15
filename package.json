@@ -16,7 +16,9 @@
     "release": "standard-version",
     "release:alpha": "standard-version --prerelease alpha",
     "release:beta": "standard-version --prerelease beta",
-    "release:rc": "standard-version --prerelease rc"
+    "release:rc": "standard-version --prerelease rc",
+    "migrate": "ts-node src/migrations/runner.ts",
+    "migrate:rollback": "ts-node src/migrations/runner.ts --rollback"
   },
   "keywords": [
     "slack",

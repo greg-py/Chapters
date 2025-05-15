@@ -1,18 +1,11 @@
 import { App } from "@slack/bolt";
-import { Cycle, Suggestion, Vote } from "./";
+import { Cycle, Suggestion } from "./";
 import { CyclePhase } from "../constants";
 import { capitalizeFirstLetter } from "../utils";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "../db";
 import { WebClient } from "@slack/web-api";
-
-interface PhaseEndTime {
-  cycleId: ObjectId;
-  channelId: string;
-  phase: CyclePhase;
-  endTime: Date;
-  attempts: number; // Track validation attempts
-}
+import { getAllActiveCycles, getCycleById } from "../dto";
 
 interface VoteTally {
   suggestionId: ObjectId;
@@ -23,7 +16,6 @@ interface VoteTally {
  * Service to manage automatic phase transitions based on configured durations
  */
 export class PhaseTransitionService {
-  private phaseEndTimes: Map<string, PhaseEndTime> = new Map();
   private intervalId: NodeJS.Timeout | null = null;
   private client: WebClient | null = null;
   private app: App | null = null;
@@ -87,11 +79,6 @@ export class PhaseTransitionService {
       return;
     }
 
-    // Initialize phase end times for all active cycles
-    this.initializePhaseEndTimes().catch((error) => {
-      console.error("Error initializing phase end times:", error);
-    });
-
     // Start interval to check for phase transitions
     this.intervalId = setInterval(() => {
       this.checkPhaseTransitions().catch((error) => {
@@ -121,23 +108,24 @@ export class PhaseTransitionService {
   }
 
   /**
-   * Initialize phase end times for all active cycles
+   * Check for and perform phase transitions for cycles past their end time
    */
-  private async initializePhaseEndTimes(): Promise<void> {
+  private async checkPhaseTransitions(): Promise<void> {
     try {
-      // Clear any existing phase end times to prevent stale data
-      this.phaseEndTimes.clear();
-
-      // Get all active cycles from the database
+      // Get all active cycles using the DTO function
       const db = await connectToDatabase();
-      const activeCycles = await db
-        .collection("cycles")
-        .find({ status: "active" })
-        .toArray();
+      const activeCycles = await getAllActiveCycles(db);
+
+      if (activeCycles.length === 0) {
+        return;
+      }
+
+      const now = new Date();
+      const phaseChangePromises: Promise<void>[] = [];
 
       for (const cycleData of activeCycles) {
         const cycle = new Cycle(
-          cycleData.id,
+          cycleData._id,
           cycleData.channelId,
           cycleData.name,
           cycleData.startDate,
@@ -145,133 +133,47 @@ export class PhaseTransitionService {
           cycleData.stats,
           cycleData.phaseDurations,
           cycleData.currentPhase,
-          cycleData.selectedBookId
+          cycleData.selectedBookId,
+          cycleData.phaseTimings
         );
 
-        this.calculateAndSetPhaseEndTime(cycle);
+        // Skip pending cycles
+        if (cycle.getCurrentPhase() === CyclePhase.PENDING) {
+          continue;
+        }
+
+        // If the phase has no start date, set it now
+        if (!cycle.getCurrentPhaseStartDate()) {
+          await cycle.setCurrentPhaseStartDate();
+          continue;
+        }
+
+        // Calculate when the phase should end based on the start date and duration
+        const calculatedEndDate = cycle.calculateCurrentPhaseEndDate();
+
+        // If there's no calculated end date, skip
+        if (!calculatedEndDate) {
+          continue;
+        }
+
+        // If the calculated end date has passed, transition the phase
+        if (now >= calculatedEndDate) {
+          phaseChangePromises.push(this.handlePhaseTransition(cycle));
+        }
       }
 
-      console.log(
-        `Initialized phase end times for ${activeCycles.length} active cycles`
-      );
+      await Promise.allSettled(phaseChangePromises);
     } catch (error) {
-      console.error("Error initializing phase end times:", error);
-      throw error;
+      console.error("Error checking phase transitions:", error);
     }
-  }
-
-  /**
-   * Calculate and set the phase end time for a cycle
-   */
-  public calculateAndSetPhaseEndTime(cycle: Cycle): void {
-    const currentPhase = cycle.getCurrentPhase();
-    if (currentPhase === CyclePhase.PENDING) {
-      return; // Skip pending cycles
-    }
-
-    const phaseDurations = cycle.getPhaseDurations();
-    const phaseDuration =
-      phaseDurations[currentPhase as keyof typeof phaseDurations];
-
-    if (!phaseDuration) {
-      console.error(
-        `Invalid phase duration for cycle ${cycle.getId()}, phase ${currentPhase}`
-      );
-      return;
-    }
-
-    // Calculate end time based on phase duration (in days)
-    const now = new Date();
-    const endTime = new Date(
-      now.getTime() + phaseDuration * 24 * 60 * 60 * 1000
-    );
-
-    this.phaseEndTimes.set(cycle.getId().toString(), {
-      cycleId: cycle.getId(),
-      channelId: cycle.getChannelId(),
-      phase: currentPhase as CyclePhase,
-      endTime,
-      attempts: 0,
-    });
-
-    // In test mode, show the end time in a more readable format
-    if (process.env.PHASE_TEST_MODE === "true") {
-      const seconds = Math.round((endTime.getTime() - now.getTime()) / 1000);
-      console.log(
-        `🧪 TEST MODE: Set phase end time for cycle ${cycle.getId()}, phase ${currentPhase}: ${endTime} (in ${seconds} seconds)`
-      );
-    } else {
-      console.log(
-        `Set phase end time for cycle ${cycle.getId()}, phase ${currentPhase}: ${endTime}`
-      );
-    }
-  }
-
-  /**
-   * Check for and perform phase transitions for cycles past their end time
-   */
-  private async checkPhaseTransitions(): Promise<void> {
-    // If there are no phase end times to check, skip the check
-    if (this.phaseEndTimes.size === 0) {
-      return;
-    }
-
-    const now = new Date();
-    const phaseChangePromises: Promise<void>[] = [];
-
-    // Clone the Map entries to avoid modification during iteration
-    const entries = Array.from(this.phaseEndTimes.entries());
-
-    for (const [cycleId, phaseInfo] of entries) {
-      if (now >= phaseInfo.endTime) {
-        phaseChangePromises.push(
-          this.handlePhaseTransition(cycleId, phaseInfo)
-        );
-      }
-    }
-
-    await Promise.allSettled(phaseChangePromises);
   }
 
   /**
    * Handle phase transition for a specific cycle
    */
-  private async handlePhaseTransition(
-    cycleId: string,
-    phaseInfo: PhaseEndTime
-  ): Promise<void> {
+  private async handlePhaseTransition(cycle: Cycle): Promise<void> {
     try {
-      // Get the cycle by ID directly from the database
-      const db = await connectToDatabase();
-      const cycleData = await db
-        .collection("cycles")
-        .findOne({ id: phaseInfo.cycleId });
-
-      if (!cycleData) {
-        // Cycle no longer exists, remove from tracking
-        this.phaseEndTimes.delete(cycleId);
-        return;
-      }
-
-      const cycle = new Cycle(
-        cycleData.id,
-        cycleData.channelId,
-        cycleData.name,
-        cycleData.startDate,
-        cycleData.status,
-        cycleData.stats,
-        cycleData.phaseDurations,
-        cycleData.currentPhase,
-        cycleData.selectedBookId
-      );
-
-      // Verify the cycle is still in the phase we expect
       const currentPhase = cycle.getCurrentPhase();
-      if (currentPhase !== phaseInfo.phase) {
-        // Phase was manually changed, recalculate end time
-        this.calculateAndSetPhaseEndTime(cycle);
-        return;
-      }
 
       // Special handling for discussion phase ending - complete the cycle
       if (currentPhase === CyclePhase.DISCUSSION) {
@@ -290,12 +192,12 @@ export class PhaseTransitionService {
         // Perform the phase transition
         await this.transitionPhase(cycle, nextPhase);
       } else {
-        // Phase transition is not valid, extend the end time and notify
-        this.extendPhaseEndTime(cycleId, phaseInfo);
+        // Phase transition is not valid, notify about the issue
+        await this.notifyInvalidTransition(cycle, nextPhase);
       }
     } catch (error) {
       console.error(
-        `Error handling phase transition for cycle ${cycleId}:`,
+        `Error handling phase transition for cycle ${cycle.getId()}:`,
         error
       );
     }
@@ -370,8 +272,8 @@ export class PhaseTransitionService {
 
       // Find the winner (first place in ranked choice voting)
       const winningBookId = voteTallies[0].suggestionId;
-      const winnerSuggestion = suggestions.find(
-        (s) => s.getId().toString() === winningBookId.toString()
+      const winnerSuggestion = suggestions.find((s) =>
+        s.getId().equals(winningBookId)
       );
 
       if (!winnerSuggestion) {
@@ -391,74 +293,49 @@ export class PhaseTransitionService {
   }
 
   /**
-   * Tally votes for a cycle based on suggestions
-   */
-  private tallyVotesForCycle(suggestions: Suggestion[]): VoteTally[] {
-    // Sort suggestions by their total points in descending order
-    const tallies = suggestions
-      .map((suggestion) => ({
-        suggestionId: suggestion.getId(),
-        totalPoints: suggestion.getTotalPoints() || 0,
-      }))
-      .sort((a, b) => b.totalPoints - a.totalPoints);
-
-    return tallies;
-  }
-
-  /**
-   * Count the number of users who have voted in a cycle
-   */
-  private countVotesForCycle(suggestions: Suggestion[]): number {
-    const voterSet = new Set<string>();
-
-    suggestions.forEach((suggestion) => {
-      const voters = suggestion.getVoters();
-      voters.forEach((voter) => voterSet.add(voter));
-    });
-
-    return voterSet.size;
-  }
-
-  /**
-   * Transition a cycle to the next phase
+   * Perform a phase transition
    */
   private async transitionPhase(
     cycle: Cycle,
     nextPhase: CyclePhase
   ): Promise<void> {
+    try {
+      // Set the end date for the current phase
+      await cycle.setCurrentPhaseEndDate();
+
+      // Update the cycle to the new phase
+      const updatedCycle = await cycle.update({ currentPhase: nextPhase });
+
+      // Set the start date for the new phase
+      await updatedCycle.setCurrentPhaseStartDate();
+
+      // Notify the channel about the phase transition
+      await this.notifyPhaseTransition(cycle, nextPhase);
+
+      console.log(
+        `Auto-transitioned cycle ${cycle.getId()} from ${cycle.getCurrentPhase()} to ${nextPhase}`
+      );
+    } catch (error) {
+      console.error("Error transitioning phase:", error);
+    }
+  }
+
+  /**
+   * Notify the channel about a phase transition
+   */
+  private async notifyPhaseTransition(
+    cycle: Cycle,
+    nextPhase: CyclePhase
+  ): Promise<void> {
     if (!this.client) {
-      console.error("Cannot transition phase: client is null");
+      console.error("Cannot notify phase transition: client is null");
       return;
     }
 
-    const currentPhase = cycle.getCurrentPhase();
     const channelId = cycle.getChannelId();
-
-    // RULE 3: If moving back to suggestion phase, clear selected book and votes
-    let updateData: {
-      currentPhase: CyclePhase;
-      selectedBookId?: null;
-    } = { currentPhase: nextPhase };
-
     let announcementMsg = `:rotating_light: *Automatic Book Club Phase Change*\n\nThe "${cycle.getName()}" book club cycle has moved to the *${capitalizeFirstLetter(
       nextPhase
     )} Phase*.`;
-
-    if (
-      nextPhase === CyclePhase.SUGGESTION &&
-      (currentPhase === CyclePhase.VOTING ||
-        currentPhase === CyclePhase.READING ||
-        currentPhase === CyclePhase.DISCUSSION)
-    ) {
-      // Clear the selected book
-      updateData.selectedBookId = null;
-
-      // Reset all votes for the cycle
-      await Vote.resetVotesForCycle(cycle.getId());
-
-      // Add to announcement
-      announcementMsg += `\n\nThis is a reset back to the suggestion phase. Any previously selected book has been cleared and all votes have been reset, but existing suggestions remain. Members can now suggest additional books using \`/chapters-suggest-book\`.`;
-    }
 
     // If transitioning to VOTING phase, include all suggested books
     if (nextPhase === CyclePhase.VOTING) {
@@ -489,11 +366,9 @@ export class PhaseTransitionService {
       if (!selectedBookId) {
         const success = await this.autoSelectWinner(cycle);
         if (success) {
-          // Get the updated cycle with the newly selected book
+          // Get the updated cycle with the newly selected book using the DTO function
           const db = await connectToDatabase();
-          const updatedCycleData = await db
-            .collection("cycles")
-            .findOne({ id: cycle.getId() });
+          const updatedCycleData = await getCycleById(db, cycle.getId());
 
           if (updatedCycleData && updatedCycleData.selectedBookId) {
             selectedBookId = updatedCycleData.selectedBookId;
@@ -559,140 +434,57 @@ export class PhaseTransitionService {
       announcementMsg += `\n\nThis phase will end in ${duration} days.`;
     }
 
-    // Update the cycle
-    const updatedCycle = await cycle.update(updateData);
-
     // Post announcement in the channel
     await this.client.chat.postMessage({
       channel: channelId,
       text: announcementMsg,
     });
 
-    // Recalculate the end time for the new phase
-    this.calculateAndSetPhaseEndTime(updatedCycle);
-
+    // Log the transition
     console.log(
-      `Cycle ${cycle.getId()} automatically transitioned from ${currentPhase} to ${nextPhase}`
+      `Cycle ${cycle.getId()} automatically transitioned from ${cycle.getCurrentPhase()} to ${nextPhase}`
     );
   }
 
   /**
-   * Extend the phase end time by one day after failed validation
+   * Notify the channel about a failed phase transition
    */
-  private extendPhaseEndTime(cycleId: string, phaseInfo: PhaseEndTime): void {
-    const currentAttempts = phaseInfo.attempts + 1;
-
-    // Extend by one minute in test mode, otherwise one day
-    const extensionMs =
-      process.env.PHASE_TEST_MODE === "true"
-        ? 60 * 1000 // 1 minute in test mode
-        : 24 * 60 * 60 * 1000; // 1 day in normal mode
-
-    const newEndTime = new Date(phaseInfo.endTime.getTime() + extensionMs);
-
-    this.phaseEndTimes.set(cycleId, {
-      ...phaseInfo,
-      endTime: newEndTime,
-      attempts: currentAttempts,
-    });
-
-    // Notify in the channel if necessary
-    this.notifyExtendedDeadline(phaseInfo, newEndTime, currentAttempts).catch(
-      (error) => {
-        console.error(
-          `Error notifying extended deadline for cycle ${cycleId}:`,
-          error
-        );
-      }
-    );
-
-    // Log with appropriate time unit
-    const extensionUnit =
-      process.env.PHASE_TEST_MODE === "true" ? "minute" : "day";
-    console.log(
-      `Extended phase end time for cycle ${cycleId} to ${newEndTime} (by 1 ${extensionUnit})`
-    );
-  }
-
-  /**
-   * Send a notification that the phase deadline has been extended
-   */
-  private async notifyExtendedDeadline(
-    phaseInfo: PhaseEndTime,
-    newEndTime: Date,
-    attempts: number
+  private async notifyInvalidTransition(
+    cycle: Cycle,
+    attemptedPhase: CyclePhase
   ): Promise<void> {
     if (!this.client) {
-      console.error("Cannot notify extended deadline: client is null");
+      console.error("Cannot notify invalid transition: client is null");
       return;
     }
 
-    // In test mode, notify on every attempt. In normal mode, only on 1st, 3rd, 7th day, etc.
-    if (
-      process.env.PHASE_TEST_MODE !== "true" &&
-      attempts !== 1 &&
-      attempts !== 3 &&
-      attempts !== 7 &&
-      attempts % 7 !== 0
-    ) {
-      return;
+    const channelId = cycle.getChannelId();
+    let message = `:rotating_light: *Automatic Book Club Phase Change*\n\nThe "${cycle.getName()}" book club cycle has encountered an issue with the phase transition.`;
+
+    // Explain why based on current phase
+    if (attemptedPhase === CyclePhase.SUGGESTION) {
+      message += `\n\nReason: At least 3 book suggestions are required before moving to the next phase. Use \`/chapters-suggest-book\` to add suggestions.`;
+    } else if (attemptedPhase === CyclePhase.VOTING) {
+      message += `\n\nReason: More votes are needed to select a book. Use \`/chapters-vote\` to cast your vote.`;
     }
 
-    try {
-      // Get the cycle directly from the database
-      const db = await connectToDatabase();
-      const cycleData = await db
-        .collection("cycles")
-        .findOne({ id: phaseInfo.cycleId });
+    message += `\n\nThe cycle will now remain in the ${capitalizeFirstLetter(
+      cycle.getCurrentPhase()
+    )} phase.`;
 
-      if (!cycleData) return;
+    // Post notification in the channel
+    await this.client.chat.postMessage({
+      channel: channelId,
+      text: message,
+    });
 
-      const cycle = new Cycle(
-        cycleData.id,
-        cycleData.channelId,
-        cycleData.name,
-        cycleData.startDate,
-        cycleData.status,
-        cycleData.stats,
-        cycleData.phaseDurations,
-        cycleData.currentPhase,
-        cycleData.selectedBookId
-      );
-
-      const extensionUnit =
-        process.env.PHASE_TEST_MODE === "true" ? "minute" : "day";
-
-      let message = `:clock1: *Book Club Phase Change Delayed*\n\nThe ${capitalizeFirstLetter(
-        phaseInfo.phase
-      )} phase for cycle "${cycle.getName()}" has been extended by another ${extensionUnit}.`;
-
-      // Explain why based on current phase
-      if (phaseInfo.phase === CyclePhase.SUGGESTION) {
-        message += `\n\nReason: At least 3 book suggestions are required before moving to the next phase. Use \`/chapters-suggest-book\` to add suggestions.`;
-      } else if (phaseInfo.phase === CyclePhase.VOTING) {
-        message += `\n\nReason: More votes are needed to select a book. Use \`/chapters-vote\` to cast your vote.`;
-      }
-
-      message += `\n\nThe phase will now end on ${newEndTime.toLocaleDateString()}`;
-
-      // Add more precise time in test mode
-      if (process.env.PHASE_TEST_MODE === "true") {
-        message += ` at ${newEndTime.toLocaleTimeString()}`;
-      }
-
-      message += ` if requirements are met.`;
-
-      await this.client.chat.postMessage({
-        channel: phaseInfo.channelId,
-        text: message,
-      });
-    } catch (error) {
-      console.error("Error sending deadline extension notification:", error);
-    }
+    console.log(
+      `Cycle ${cycle.getId()} failed to transition from ${cycle.getCurrentPhase()} to ${attemptedPhase}`
+    );
   }
 
   /**
-   * Determine the next phase in the cycle sequence
+   * Get the next phase in the sequence
    */
   private getNextPhase(currentPhase: string): CyclePhase {
     switch (currentPhase) {
@@ -705,55 +497,10 @@ export class PhaseTransitionService {
       case CyclePhase.READING:
         return CyclePhase.DISCUSSION;
       case CyclePhase.DISCUSSION:
-        // For discussion phase, we'll handle completion differently
-        // but still need to return a value for other functions
-        return CyclePhase.SUGGESTION;
+        return CyclePhase.DISCUSSION; // No next phase, remains in discussion
       default:
-        return CyclePhase.SUGGESTION;
+        return CyclePhase.PENDING;
     }
-  }
-
-  /**
-   * Update tracking when a cycle's configuration changes
-   */
-  public onCycleUpdated(cycle: Cycle): void {
-    this.calculateAndSetPhaseEndTime(cycle);
-  }
-
-  /**
-   * Register for a new cycle creation
-   */
-  public onNewCycle(cycle: Cycle): void {
-    // Clear any existing data for this channel's cycle to avoid conflicts
-    // First, find any existing entry for this channel ID
-    const existingEntries = Array.from(this.phaseEndTimes.entries()).filter(
-      ([_, info]) => info.channelId === cycle.getChannelId()
-    );
-
-    // Remove any existing entries for this channel
-    for (const [existingCycleId] of existingEntries) {
-      this.phaseEndTimes.delete(existingCycleId);
-    }
-
-    // Calculate and set the phase end time for the new cycle
-    this.calculateAndSetPhaseEndTime(cycle);
-  }
-
-  /**
-   * Remove a cycle from tracking when it's completed
-   */
-  public onCycleCompleted(channelId: string): void {
-    // Find any existing entry for this channel ID
-    const existingEntries = Array.from(this.phaseEndTimes.entries()).filter(
-      ([_, info]) => info.channelId === channelId
-    );
-
-    // Remove any existing entries for this channel
-    for (const [existingCycleId] of existingEntries) {
-      this.phaseEndTimes.delete(existingCycleId);
-    }
-
-    console.log(`Removed completed cycle tracking for channel ${channelId}`);
   }
 
   /**
@@ -764,34 +511,55 @@ export class PhaseTransitionService {
   }
 
   /**
-   * Complete a cycle at the end of the discussion phase
+   * Complete a cycle
    */
   private async completeCycle(cycle: Cycle): Promise<void> {
+    try {
+      // Set the end date for the discussion phase
+      await cycle.setCurrentPhaseEndDate();
+
+      // Update the cycle status to completed
+      await cycle.update({ status: "completed" });
+
+      // Notify the channel about cycle completion
+      await this.notifyCycleCompletion(cycle);
+
+      console.log(`Auto-completed cycle ${cycle.getId()}`);
+    } catch (error) {
+      console.error("Error completing cycle:", error);
+    }
+  }
+
+  /**
+   * Notify the channel about a cycle completion
+   */
+  private async notifyCycleCompletion(cycle: Cycle): Promise<void> {
     if (!this.client) {
-      console.error("Cannot complete cycle: client is null");
+      console.error("Cannot notify cycle completion: client is null");
       return;
     }
 
-    try {
-      const channelId = cycle.getChannelId();
+    const channelId = cycle.getChannelId();
+    await this.client.chat.postMessage({
+      channel: channelId,
+      text: `:tada: *Book Club Cycle Completed!*\n\nThe book club cycle "${cycle.getName()}" has been completed and archived.\n\nTo start a new book club cycle, use the \`/chapters-start-cycle\` command.`,
+    });
 
-      // Update cycle status to completed
-      await cycle.update({ status: "completed" });
+    console.log(`Cycle ${cycle.getId()} completed and archived`);
+  }
 
-      // Post announcement in the channel
-      await this.client.chat.postMessage({
-        channel: channelId,
-        text: `:tada: *Book Club Cycle Completed!*\n\nThe book club cycle "${cycle.getName()}" has been completed and archived.\n\nTo start a new book club cycle, use the \`/chapters-start-cycle\` command.`,
-      });
+  /**
+   * Tally votes for a cycle
+   */
+  private tallyVotesForCycle(suggestions: Suggestion[]): VoteTally[] {
+    // Sort suggestions by their total points in descending order
+    const tallies = suggestions
+      .map((suggestion) => ({
+        suggestionId: suggestion.getId(),
+        totalPoints: suggestion.getTotalPoints() || 0,
+      }))
+      .sort((a, b) => b.totalPoints - a.totalPoints);
 
-      // Remove the cycle from tracking
-      this.onCycleCompleted(channelId);
-
-      console.log(
-        `Cycle ${cycle.getId()} automatically completed after discussion phase`
-      );
-    } catch (error) {
-      console.error(`Error completing cycle: ${error}`);
-    }
+    return tallies;
   }
 }

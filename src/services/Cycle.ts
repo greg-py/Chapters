@@ -11,6 +11,7 @@ import type {
   TCycleStatus,
   TCycleStats,
   TPhaseDurations,
+  TPhaseTimings,
   TCycle,
   TCyclePhase,
 } from "../models";
@@ -28,7 +29,8 @@ export class Cycle {
     private readonly stats: TCycleStats,
     private readonly phaseDurations: TPhaseDurations,
     private readonly currentPhase: TCyclePhase,
-    private readonly selectedBookId?: ObjectId
+    private readonly selectedBookId?: ObjectId,
+    private readonly phaseTimings?: TPhaseTimings
   ) {}
 
   /**
@@ -102,7 +104,8 @@ export class Cycle {
       cycle.stats,
       cycle.phaseDurations,
       cycle.currentPhase,
-      cycle.selectedBookId
+      cycle.selectedBookId,
+      cycle.phaseTimings
     );
   }
 
@@ -115,12 +118,14 @@ export class Cycle {
     currentPhase,
     selectedBookId,
     status,
+    phaseTimings,
   }: {
     name?: string;
     phaseDurations?: TPhaseDurations;
     currentPhase?: TCyclePhase;
     selectedBookId?: ObjectId | null;
     status?: TCycleStatus;
+    phaseTimings?: TPhaseTimings;
   }) {
     const db = await connectToDatabase();
 
@@ -133,6 +138,7 @@ export class Cycle {
       currentPhase?: TCyclePhase;
       selectedBookId?: ObjectId | undefined;
       status?: TCycleStatus;
+      phaseTimings?: TPhaseTimings;
     } = {
       _id: this.id,
       channelId: this.channelId,
@@ -147,6 +153,7 @@ export class Cycle {
       updateData.currentPhase = currentPhase;
     if (status !== undefined && status !== this.status)
       updateData.status = status;
+    if (phaseTimings !== undefined) updateData.phaseTimings = phaseTimings;
     if (selectedBookId !== undefined) {
       if (selectedBookId === null) {
         // To clear the selected book, use $unset in MongoDB
@@ -178,7 +185,8 @@ export class Cycle {
       this.stats,
       phaseDurations || this.phaseDurations,
       currentPhase || this.currentPhase,
-      updatedSelectedBookId
+      updatedSelectedBookId,
+      phaseTimings || this.phaseTimings
     );
   }
 
@@ -232,7 +240,52 @@ export class Cycle {
     return this.selectedBookId;
   }
 
+  public getPhaseTimings() {
+    return this.phaseTimings;
+  }
+
+  /**
+   * Get current phase's start date
+   */
+  public getCurrentPhaseStartDate(): Date | undefined {
+    if (!this.phaseTimings) return undefined;
+    return this.phaseTimings[this.currentPhase as keyof TPhaseTimings]
+      ?.startDate;
+  }
+
+  /**
+   * Get current phase's end date
+   */
+  public getCurrentPhaseEndDate(): Date | undefined {
+    if (!this.phaseTimings) return undefined;
+    return this.phaseTimings[this.currentPhase as keyof TPhaseTimings]?.endDate;
+  }
+
+  /**
+   * Calculate the expected end date for the current phase
+   * based on the stored start date and phase duration
+   */
+  public calculateCurrentPhaseEndDate(): Date | undefined {
+    const startDate = this.getCurrentPhaseStartDate();
+    if (!startDate) return undefined;
+
+    const phaseDurations = this.phaseDurations;
+    const duration = phaseDurations[this.currentPhase as keyof TPhaseDurations];
+
+    // Convert days to milliseconds (days * 24 hours * 60 minutes * 60 seconds * 1000 milliseconds)
+    return new Date(startDate.getTime() + duration * 24 * 60 * 60 * 1000);
+  }
+
+  /**
+   * @deprecated Use getCurrentPhaseEndDate() instead
+   * This method is kept for backward compatibility
+   */
   public getCurrentPhaseDeadline() {
+    // First try to use the persisted end date
+    const endDate = this.getCurrentPhaseEndDate();
+    if (endDate) return endDate;
+
+    // Fall back to the old calculation method if no persisted end date exists
     const now = new Date();
     const phase = this.currentPhase;
 
@@ -245,5 +298,59 @@ export class Cycle {
 
     // Convert days to milliseconds (days * 24 hours * 60 minutes * 60 seconds * 1000 milliseconds)
     return new Date(now.getTime() + duration * 24 * 60 * 60 * 1000);
+  }
+
+  /**
+   * Set the start date for the current phase, marking when it began
+   */
+  public async setCurrentPhaseStartDate(): Promise<Cycle> {
+    const now = new Date();
+
+    // Create a new phase timings object or use existing one
+    const phaseTimings = this.phaseTimings
+      ? { ...this.phaseTimings }
+      : {
+          suggestion: {},
+          voting: {},
+          reading: {},
+          discussion: {},
+        };
+
+    // Update the start date for the current phase
+    const phase = this.currentPhase as keyof TPhaseTimings;
+    phaseTimings[phase] = {
+      ...phaseTimings[phase],
+      startDate: now,
+    };
+
+    // Update the cycle with the new phase timings
+    return this.update({ phaseTimings });
+  }
+
+  /**
+   * Set the end date for the current phase, marking when it completed
+   */
+  public async setCurrentPhaseEndDate(): Promise<Cycle> {
+    const now = new Date();
+
+    // Create a new phase timings object or use existing one
+    const phaseTimings = this.phaseTimings
+      ? { ...this.phaseTimings }
+      : {
+          suggestion: {},
+          voting: {},
+          reading: {},
+          discussion: {},
+        };
+
+    // Update the end date for the current phase
+    const phase = this.currentPhase as keyof TPhaseTimings;
+    phaseTimings[phase] = {
+      ...phaseTimings[phase],
+      endDate: now,
+    };
+
+    // Update the cycle with the new phase timings
+    return this.update({ phaseTimings });
   }
 }

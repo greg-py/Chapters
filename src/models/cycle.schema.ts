@@ -22,6 +22,25 @@ export const CycleStatsSchema = z.object({
   participantCount: z.number().int().min(0),
 });
 
+export const PhaseTimingsSchema = z.object({
+  suggestion: z.object({
+    startDate: z.date().optional(),
+    endDate: z.date().optional(),
+  }),
+  voting: z.object({
+    startDate: z.date().optional(),
+    endDate: z.date().optional(),
+  }),
+  reading: z.object({
+    startDate: z.date().optional(),
+    endDate: z.date().optional(),
+  }),
+  discussion: z.object({
+    startDate: z.date().optional(),
+    endDate: z.date().optional(),
+  }),
+});
+
 export const CycleSchema = z.object({
   _id: z.instanceof(ObjectId).optional(),
   channelId: z.string(),
@@ -31,11 +50,13 @@ export const CycleSchema = z.object({
   status: CycleStatusSchema,
   stats: CycleStatsSchema,
   phaseDurations: PhaseDurationsSchema,
+  phaseTimings: PhaseTimingsSchema.optional(),
   selectedBookId: z.instanceof(ObjectId).optional(),
 });
 
 export type TCycleStatus = z.infer<typeof CycleStatusSchema>;
 export type TPhaseDurations = z.infer<typeof PhaseDurationsSchema>;
 export type TCycleStats = z.infer<typeof CycleStatsSchema>;
+export type TPhaseTimings = z.infer<typeof PhaseTimingsSchema>;
 export type TCycle = z.infer<typeof CycleSchema>;
 export type TCyclePhase = z.infer<typeof CyclePhaseSchema>;

@@ -25,7 +25,6 @@ import { API, SlackErrorCode } from "./constants";
 dotenv.config();
 
 // Create a singleton instance of the phase transition service
-// This is exported for backwards compatibility
 export const phaseTransitionService = PhaseTransitionService.getInstance(
   null as any, // Will be initialized properly in initializeServices
   process.env.PHASE_TEST_MODE === "true" ? 10 : 60 // 10 seconds for test mode, 60 minutes for production
