@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [3.0.0](https://github.com/greg-py/Chapters/compare/v2.0.0...v3.0.0) (2025-05-15)
+
+
+### Bug Fixes
+
+* Modified phase transition service and cycle schema to reference and store phase start times (closes [#10](https://github.com/greg-py/Chapters/issues/10)) ([e9f8c5b](https://github.com/greg-py/Chapters/commit/e9f8c5b7fb4f625fbfb069b4a359102e4f700c6f))
+
+
+### Code Refactoring
+
+* Adds DTO functions and collection constants, fixes duplicate document IDs (closes [#8](https://github.com/greg-py/Chapters/issues/8)) ([016dab1](https://github.com/greg-py/Chapters/commit/016dab1be0e2e6c9f4e3ba69ec0f12cb6d69babc))
+* Refactored server files by combining into single index file and separating utilities and validators ([7370ca2](https://github.com/greg-py/Chapters/commit/7370ca282f1c8fea0e8efee87de1da15327173a6))
+
 ## [2.0.0](https://github.com/greg-py/Chapters/compare/v1.2.0...v2.0.0) (2025-05-14)
 
 
