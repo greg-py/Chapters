@@ -4,13 +4,59 @@ import { capitalizeFirstLetter, withActionErrorHandling } from "../../utils";
 import { ActionId, BlockId, CyclePhase } from "../../constants";
 import { validateActiveCycleExists } from "../../validators";
 import { ObjectId } from "mongodb";
-import { phaseTransitionService } from "../../index";
 import { connectToDatabase } from "../../db";
 import {
   deleteVotesByCycle,
   deleteSuggestionsByCycle,
   deleteCycleById,
 } from "../../dto";
+import { TPhaseTimings } from "../../models/cycle.schema";
+
+/**
+ * Clears timing data for all phases after the specified phase
+ * @param phaseTimings - The current phase timings
+ * @param selectedPhase - The phase being transitioned to
+ * @returns Updated phase timings with timing data cleared for later phases
+ */
+const clearLaterPhaseTimings = (
+  phaseTimings: TPhaseTimings | undefined,
+  selectedPhase: CyclePhase
+): TPhaseTimings => {
+  if (!phaseTimings) {
+    return {
+      suggestion: {},
+      voting: {},
+      reading: {},
+      discussion: {},
+    };
+  }
+
+  // Clone the existing timings
+  const updatedTimings = { ...phaseTimings };
+
+  // Define the phase order to determine which phases come after the selected phase
+  const phaseOrder = [
+    CyclePhase.SUGGESTION,
+    CyclePhase.VOTING,
+    CyclePhase.READING,
+    CyclePhase.DISCUSSION,
+  ];
+
+  // Find the index of the selected phase
+  const selectedIndex = phaseOrder.indexOf(selectedPhase);
+
+  // Clear timing data for all phases after the selected phase
+  phaseOrder.forEach((phase, index) => {
+    if (index > selectedIndex) {
+      // Only update if the phase exists in our timings object
+      if (phase in updatedTimings) {
+        updatedTimings[phase as keyof TPhaseTimings] = {};
+      }
+    }
+  });
+
+  return updatedTimings;
+};
 
 /**
  * Registers all cycle actions
@@ -83,8 +129,8 @@ export const registerCycleActions = (app: App): void => {
           currentPhase: CyclePhase.SUGGESTION, // Start in suggestion phase after config
         });
 
-        // Notify the phase transition service about the updated cycle
-        phaseTransitionService.onCycleUpdated(updatedCycle);
+        // Set the start date for the suggestion phase
+        await updatedCycle.setCurrentPhaseStartDate();
 
         // Post confirmation message to user by replacing the original message
         await respond({
@@ -131,8 +177,8 @@ export const registerCycleActions = (app: App): void => {
         currentPhase: CyclePhase.SUGGESTION, // Start in suggestion phase after config
       });
 
-      // Notify the phase transition service about the updated cycle
-      phaseTransitionService.onCycleUpdated(updatedCycle);
+      // Set the start date for the suggestion phase
+      await updatedCycle.setCurrentPhaseStartDate();
 
       // Post confirmation message to user by replacing the original message
       await respond({
@@ -193,6 +239,17 @@ export const registerCycleActions = (app: App): void => {
         // Throwing an error will be caught by withActionErrorHandling, which sends a new ephemeral error.
         // This is acceptable as it's an unexpected system state.
         throw new Error(`Invalid phase value selected: ${selectedPhaseValue}`);
+      }
+
+      // Check if the user is trying to set the phase to the current phase
+      if (selectedPhase === currentPhase) {
+        await respond({
+          text: `ℹ️ The book club is already in the ${capitalizeFirstLetter(
+            currentPhase
+          )} phase. No changes have been made.`,
+          replace_original: true,
+        });
+        return;
       }
 
       // Get current book suggestions for the cycle
@@ -308,7 +365,19 @@ export const registerCycleActions = (app: App): void => {
       let updateData: {
         currentPhase: CyclePhase;
         selectedBookId?: null;
+        phaseTimings?: TPhaseTimings;
       } = { currentPhase: selectedPhase };
+
+      // If moving to a different phase, set the end date for the current phase
+      if (currentPhase !== selectedPhase) {
+        await cycle.setCurrentPhaseEndDate();
+
+        // Clear timing data for all phases after the selected phase
+        updateData.phaseTimings = clearLaterPhaseTimings(
+          cycle.getPhaseTimings(),
+          selectedPhase
+        );
+      }
 
       let confirmationMsg = `✅ The book club cycle has been moved to the ${capitalizeFirstLetter(
         selectedPhase
@@ -317,11 +386,17 @@ export const registerCycleActions = (app: App): void => {
         selectedPhase
       )} Phase*.`;
 
+      // Handle transitions from later phases back to earlier phases
+      // This covers transitions from reading/discussion back to suggestion/voting
+      // and from voting back to suggestion
       if (
-        selectedPhase === CyclePhase.SUGGESTION &&
-        (currentPhase === CyclePhase.VOTING ||
-          currentPhase === CyclePhase.READING ||
-          currentPhase === CyclePhase.DISCUSSION)
+        (selectedPhase === CyclePhase.SUGGESTION &&
+          (currentPhase === CyclePhase.VOTING ||
+            currentPhase === CyclePhase.READING ||
+            currentPhase === CyclePhase.DISCUSSION)) ||
+        (selectedPhase === CyclePhase.VOTING &&
+          (currentPhase === CyclePhase.READING ||
+            currentPhase === CyclePhase.DISCUSSION))
       ) {
         // Clear the selected book
         updateData.selectedBookId = null;
@@ -329,18 +404,25 @@ export const registerCycleActions = (app: App): void => {
         // Reset all votes for the cycle
         await Vote.resetVotesForCycle(cycle.getId());
 
-        // Add warning to the confirmation message
-        confirmationMsg += ` Any previously selected book has been cleared and all votes have been reset, but existing suggestions have been kept.`;
-
-        // Add to announcement
-        announcementMsg += `\n\nThis is a reset back to the suggestion phase. Any previously selected book has been cleared and all votes have been reset, but existing suggestions remain. Members can now suggest additional books using \`/chapters-suggest-book\`.`;
+        // Add phase-specific messages
+        if (selectedPhase === CyclePhase.SUGGESTION) {
+          // Suggestion phase messaging
+          confirmationMsg += ` Any previously selected book has been cleared and all votes have been reset, but existing suggestions have been kept.`;
+          announcementMsg += `\n\nThis is a reset back to the suggestion phase. Any previously selected book has been cleared and all votes have been reset, but existing suggestions remain. Members can now suggest additional books using \`/chapters-suggest-book\`.`;
+        } else {
+          // Voting phase messaging
+          confirmationMsg += ` The previously selected book has been cleared and all votes have been reset so that members can vote for a book again.`;
+          announcementMsg += `\n\nThis is a reset back to the voting phase. The previously selected book has been cleared and all votes have been reset. Members can vote again using \`/chapters-vote\`.`;
+        }
       }
 
       // Update the cycle
       const updatedCycle = await cycle.update(updateData);
 
-      // Notify the phase transition service about the updated cycle
-      phaseTransitionService.onCycleUpdated(updatedCycle);
+      // Set the start date for the new phase
+      if (currentPhase !== selectedPhase) {
+        await updatedCycle.setCurrentPhaseStartDate();
+      }
 
       // Send confirmation to the user
       await respond({
@@ -405,10 +487,14 @@ export const registerCycleActions = (app: App): void => {
       const updatedCycle = await cycle.update({
         currentPhase: selectedPhase,
         selectedBookId: selectedBookId,
+        phaseTimings: clearLaterPhaseTimings(
+          cycle.getPhaseTimings(),
+          selectedPhase
+        ),
       });
 
-      // Notify the phase transition service about the updated cycle
-      phaseTransitionService.onCycleUpdated(updatedCycle);
+      // Set the start date for the new phase
+      await updatedCycle.setCurrentPhaseStartDate();
 
       // Get the selected book details
       const selectedBook = await Suggestion.getById(selectedBookId);
@@ -492,9 +578,6 @@ export const registerCycleActions = (app: App): void => {
         const cycle = await validateActiveCycleExists(channelId);
         const cycleName = cycle.getName();
         const cycleId = cycle.getId();
-
-        // Remove the cycle from phase transition service tracking
-        phaseTransitionService.onCycleCompleted(channelId);
 
         // Get database connection
         const db = await connectToDatabase();
@@ -591,10 +674,6 @@ export const registerCycleActions = (app: App): void => {
         const cycle = await validateActiveCycleExists(channelId);
         const cycleId = cycle.getId();
         const cycleName = cycle.getName(); // Get name for the message
-
-        // Remove the cycle from phase transition service tracking
-        // This is important because the cycle was registered when /chapters-start-cycle was called
-        phaseTransitionService.onCycleCompleted(channelId);
 
         // Get database connection
         const db = await connectToDatabase();

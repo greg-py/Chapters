@@ -10,7 +10,6 @@ import {
   sendCyclePhaseSelectionUI,
   sendCycleStatusMessage,
 } from "./ui";
-import { phaseTransitionService } from "../../index";
 import { CyclePhase, ActionId } from "../../constants";
 
 /**
@@ -27,9 +26,6 @@ export function registerCycleCommands(app: App): void {
 
       // Initializes the cycle by creating a new instance
       const cycle = await Cycle.createNew(command.channel_id);
-
-      // Register the new cycle with the phase transition service
-      phaseTransitionService.onNewCycle(cycle);
 
       // Prompt user for custom cycle configuration values
       await sendCycleConfigurationUI(cycle, client, command);
@@ -78,8 +74,8 @@ export function registerCycleCommands(app: App): void {
       // Update the cycle status using the update method
       await cycle.update({ status: "completed" });
 
-      // Remove the cycle from phase transition service tracking
-      phaseTransitionService.onCycleCompleted(command.channel_id);
+      // Set the end date for the discussion phase
+      await cycle.setCurrentPhaseEndDate();
 
       // Send confirmation to the user
       await client.chat.postEphemeral({
