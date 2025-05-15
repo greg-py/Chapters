@@ -30,15 +30,17 @@ Chapters is a comprehensive Slack bot designed to streamline book club managemen
    ```
    # Slack App Credentials
    SLACK_APP_BOT_TOKEN=xoxb-your-dev-bot-token
-   SLACK_APP_TOKEN=xapp-your-dev-app-token
    SLACK_APP_SIGNING_SECRET=your-dev-signing-secret
+
+   # Socket Mode configuration (required only for development)
+   USE_SOCKET_MODE=true
+   SLACK_APP_TOKEN=xapp-your-dev-app-token  # Required only when USE_SOCKET_MODE=true
 
    # MongoDB Configuration (for local development)
    MONGODB_URI=mongodb://mongodb:27017/chapters
 
    # Application Configuration
    NODE_ENV=development
-   USE_SOCKET_MODE=true
    ```
 
 2. Install dependencies:
@@ -58,7 +60,7 @@ This will:
 
 - Start MongoDB in a Docker container
 - Start the application in development mode with hot reloading
-- Use Socket Mode for Slack communication
+- Use Socket Mode for Slack communication (if enabled)
 - Mount your local code for live updates
 
 #### Phase Testing Mode
@@ -82,23 +84,22 @@ This will:
 
 ### Development vs Production
 
-The application has two distinct environments:
+The application has two distinct environments that share the same codebase:
 
 #### Development Environment
 
 - Uses Docker Compose for local development
-- Runs in Socket Mode (no public URL needed)
+- Can run in Socket Mode (no public URL needed) or HTTP mode
 - Uses local MongoDB instance
 - Supports hot reloading
 - Includes phase testing mode for rapid testing
 
 #### Production Environment
 
-- Deployed to Vercel
+- Deployed to Vercel as serverless functions
 - Uses HTTP Mode (requires public URL)
 - Uses MongoDB Atlas or similar cloud database
 - Runs in production mode with optimized settings
-- No phase testing mode available
 
 ## Command Reference
 
@@ -224,6 +225,25 @@ When the book club transitions between phases (either automatically or manually)
 These messages help guide members through each phase of the book club with relevant context and instructions.
 
 ## Development
+
+### Application Architecture
+
+The application is structured with a modular, maintainable architecture:
+
+#### Core files:
+
+- `src/index.ts` - Main entry point for both development and production environments
+- `src/constants.ts` - Centralized configuration constants
+- `src/config.ts` - Environment-specific configuration
+
+#### Key directories:
+
+- `src/validators/` - Input and environment validation
+- `src/utils/` - Shared utilities including server, shutdown handling and version tracking
+- `src/services/` - Core services like phase transitions
+- `src/features/` - Command and event handlers
+- `src/db/` - Database models and connection utilities
+- `src/dto/` - Data transfer objects
 
 ### Test Mode for Rapid Phase Transitions
 

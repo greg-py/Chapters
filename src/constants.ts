@@ -64,3 +64,45 @@ export const BlockId = {
   SECOND_CHOICE: "second_choice",
   THIRD_CHOICE: "third_choice",
 };
+
+/**
+ * Slack API endpoint paths
+ */
+export const SlackEndpoints = {
+  EVENTS: "/slack/events",
+  COMMANDS: "/slack/commands",
+  INTERACTIONS: "/slack/interactions",
+};
+
+/**
+ * Slack API error codes
+ */
+export enum SlackErrorCode {
+  RATE_LIMITED = "slack_webapi_platform_error",
+  REQUEST_ERROR = "slack_webapi_request_error",
+}
+
+/**
+ * API service constants
+ */
+export const API = {
+  HEALTH_CHECK_PATH: "/",
+  DEFAULT_PORT: 3000,
+  SHUTDOWN_TIMEOUT_MS: 5000,
+};
+
+/**
+ * Security related constants
+ */
+export const Security = {
+  HEADERS: {
+    CONTENT_TYPE_OPTIONS: "X-Content-Type-Options",
+    FRAME_OPTIONS: "X-Frame-Options",
+    XSS_PROTECTION: "X-XSS-Protection",
+  },
+  HEADER_VALUES: {
+    NO_SNIFF: "nosniff",
+    DENY_FRAMES: "DENY",
+    BLOCK_XSS: "1; mode=block",
+  },
+};

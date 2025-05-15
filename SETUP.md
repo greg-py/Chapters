@@ -16,15 +16,17 @@ Create a `.env` file in the root of the project with these required variables:
 ```
 # Required Slack API credentials
 SLACK_APP_BOT_TOKEN=xoxb-your-dev-bot-token
-SLACK_APP_TOKEN=xapp-your-dev-app-token
 SLACK_APP_SIGNING_SECRET=your-dev-signing-secret
+
+# Socket Mode configuration (required only for development)
+USE_SOCKET_MODE=true
+SLACK_APP_TOKEN=xapp-your-dev-app-token  # Required only when USE_SOCKET_MODE=true
 
 # MongoDB Configuration (for local development)
 MONGODB_URI=mongodb://mongodb:27017/chapters
 
 # Application Configuration
 NODE_ENV=development
-USE_SOCKET_MODE=true
 ```
 
 ### How to Get the Tokens
@@ -160,15 +162,38 @@ Once configured:
    vercel --prod
    ```
 
+   The project is configured to use the built TypeScript files from the `dist` directory,
+   which are automatically compiled during deployment.
+
 4. **Configure Slack App for HTTP Mode**:
-   1. Disable Socket Mode in your Slack app configuration
-   2. Set the Request URLs in your Slack app dashboard:
+   1. Set the Request URLs in your Slack app dashboard:
       - **Event Subscriptions**: `https://your-app-name.vercel.app/slack/events`
       - **Interactivity & Shortcuts**: `https://your-app-name.vercel.app/slack/interactions`
       - **Slash Commands**: `https://your-app-name.vercel.app/slack/commands`
-   3. Subscribe to Bot Events under Event Subscriptions:
+   2. Subscribe to Bot Events under Event Subscriptions:
       - `app_mention`
       - Any other events your app needs to handle
+
+### Application Architecture
+
+The application is structured using a modular architecture:
+
+#### Core Structure
+
+- `src/index.ts` - Main entry point for both development and production
+- `src/constants.ts` - Centralized configuration and constants
+- `src/config.ts` - Environment-specific configuration
+
+#### Directories
+
+- `src/validators/` - Input and environment validation
+- `src/utils/` - Shared utilities (server, shutdown, version)
+- `src/services/` - Core services (phase transitions, etc.)
+- `src/features/` - Command and event handlers
+- `src/db/` - Database models and connection utilities
+- `src/dto/` - Data transfer objects
+
+This modular structure makes the codebase more maintainable and easier to extend.
 
 ### Production vs Development Differences
 
@@ -184,7 +209,7 @@ Once configured:
 
 3. **Slack Communication**:
 
-   - Development: Socket Mode (no public URL needed)
+   - Development: Can use Socket Mode (no public URL needed) or HTTP Mode
    - Production: HTTP Mode (requires public URL)
 
 4. **Performance**:
@@ -195,6 +220,16 @@ Once configured:
 5. **Testing**:
    - Development: Includes phase testing mode
    - Production: No testing modes available
+
+### Version Management
+
+The application automatically determines its version by:
+
+1. First checking for the `npm_package_version` environment variable
+2. If not available, reading directly from the `package.json` file
+3. Falling back to "unknown" if both methods fail
+
+This ensures consistent version reporting in both development and production.
 
 ## Troubleshooting
 
