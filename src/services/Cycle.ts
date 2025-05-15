@@ -53,7 +53,7 @@ export class Cycle {
     })} ${date.getFullYear()}`;
 
     const defaultCycle: TCycle = {
-      id: new ObjectId(),
+      _id: new ObjectId(),
       channelId,
       name: defaultCycleName,
       currentPhase: "pending",
@@ -94,7 +94,7 @@ export class Cycle {
     }
 
     return new Cycle(
-      cycle.id,
+      cycle._id!,
       cycle.channelId,
       cycle.name,
       cycle.startDate,
@@ -126,7 +126,7 @@ export class Cycle {
 
     // Create an update object that only includes properties that are defined
     const updateData: {
-      id: ObjectId;
+      _id: ObjectId;
       channelId: string;
       name?: string;
       phaseDurations?: TPhaseDurations;
@@ -134,7 +134,7 @@ export class Cycle {
       selectedBookId?: ObjectId | undefined;
       status?: TCycleStatus;
     } = {
-      id: this.id,
+      _id: this.id,
       channelId: this.channelId,
     };
 

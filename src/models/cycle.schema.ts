@@ -23,7 +23,7 @@ export const CycleStatsSchema = z.object({
 });
 
 export const CycleSchema = z.object({
-  id: z.instanceof(ObjectId),
+  _id: z.instanceof(ObjectId).optional(),
   channelId: z.string(),
   name: z.string(),
   currentPhase: CyclePhaseSchema,

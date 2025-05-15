@@ -6,6 +6,11 @@ import { validateActiveCycleExists } from "../../validators";
 import { ObjectId } from "mongodb";
 import { phaseTransitionService } from "../../index";
 import { connectToDatabase } from "../../db";
+import {
+  deleteVotesByCycle,
+  deleteSuggestionsByCycle,
+  deleteCycleById,
+} from "../../dto";
 
 /**
  * Registers all cycle actions
@@ -495,13 +500,13 @@ export const registerCycleActions = (app: App): void => {
         const db = await connectToDatabase();
 
         // Delete any suggestions for this cycle
-        await db.collection("suggestions").deleteMany({ cycleId: cycleId });
+        await deleteSuggestionsByCycle(db, cycleId);
 
         // Delete any votes for this cycle
-        await db.collection("votes").deleteMany({ cycleId: cycleId });
+        await deleteVotesByCycle(db, cycleId);
 
         // Delete the cycle itself
-        await db.collection("cycles").deleteOne({ id: cycleId });
+        await deleteCycleById(db, cycleId);
 
         // Send a confirmation message to the user by replacing the original message
         await respond({
@@ -595,13 +600,13 @@ export const registerCycleActions = (app: App): void => {
         const db = await connectToDatabase();
 
         // Delete any suggestions for this cycle (though unlikely at this stage)
-        await db.collection("suggestions").deleteMany({ cycleId: cycleId });
+        await deleteSuggestionsByCycle(db, cycleId);
 
         // Delete any votes for this cycle (also unlikely)
-        await db.collection("votes").deleteMany({ cycleId: cycleId });
+        await deleteVotesByCycle(db, cycleId);
 
         // Delete the cycle itself
-        await db.collection("cycles").deleteOne({ id: cycleId });
+        await deleteCycleById(db, cycleId);
 
         await respond({
           text: `Cycle configuration canceled. The provisional cycle "${cycleName}" has been deleted. The form has been dismissed.`,

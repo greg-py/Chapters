@@ -41,7 +41,7 @@ export class Suggestion {
     const db = await connectToDatabase();
 
     const suggestion: TSuggestion = {
-      id: new ObjectId(),
+      _id: new ObjectId(),
       cycleId,
       userId,
       bookName,
@@ -84,7 +84,7 @@ export class Suggestion {
     }
 
     return new Suggestion(
-      suggestion.id,
+      suggestion._id!,
       suggestion.cycleId,
       suggestion.userId,
       suggestion.bookName,
@@ -108,7 +108,7 @@ export class Suggestion {
     return suggestions.map(
       (suggestion) =>
         new Suggestion(
-          suggestion.id,
+          suggestion._id!,
           suggestion.cycleId,
           suggestion.userId,
           suggestion.bookName,
@@ -150,7 +150,7 @@ export class Suggestion {
     const newVoteCount = this.votes + 1;
 
     const modifiedCount = await updateSuggestion(db, {
-      id: this.id,
+      _id: this.id,
       votes: newVoteCount,
     });
 
@@ -187,7 +187,7 @@ export class Suggestion {
     const newVoters = [...this.voters, voterId];
 
     const modifiedCount = await updateSuggestion(db, {
-      id: this.id,
+      _id: this.id,
       totalPoints: newTotalPoints,
       voters: newVoters,
     });

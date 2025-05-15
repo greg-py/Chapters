@@ -2,7 +2,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 
 export const SuggestionSchema = z.object({
-  id: z.instanceof(ObjectId),
+  _id: z.instanceof(ObjectId).optional(),
   cycleId: z.instanceof(ObjectId),
   userId: z.string(),
   bookName: z.string(),
