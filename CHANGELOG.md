@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [3.0.1](https://github.com/greg-py/Chapters/compare/v3.0.0...v3.0.1) (2025-05-15)
+
+
+### Bug Fixes
+
+* Updated vercel config to reference routes in dist directory ([9730e70](https://github.com/greg-py/Chapters/commit/9730e701fac09fe94e6d5156e330252cda8e7908))
+
 ## [3.0.0](https://github.com/greg-py/Chapters/compare/v2.0.0...v3.0.0) (2025-05-15)
 
 
