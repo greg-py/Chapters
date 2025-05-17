@@ -22,7 +22,6 @@ export class Suggestion {
     private readonly link: string,
     private readonly notes: string | undefined,
     private readonly createdAt: Date,
-    private readonly votes: number,
     private readonly totalPoints: number = 0,
     private readonly voters: string[] = []
   ) {}
@@ -49,7 +48,6 @@ export class Suggestion {
       link,
       notes,
       createdAt: new Date(),
-      votes: 0,
       totalPoints: 0,
       voters: [],
     };
@@ -66,7 +64,6 @@ export class Suggestion {
       suggestion.link,
       suggestion.notes,
       suggestion.createdAt,
-      suggestion.votes,
       suggestion.totalPoints,
       suggestion.voters
     );
@@ -92,7 +89,6 @@ export class Suggestion {
       suggestion.link,
       suggestion.notes,
       suggestion.createdAt,
-      suggestion.votes,
       suggestion.totalPoints,
       suggestion.voters
     );
@@ -116,7 +112,6 @@ export class Suggestion {
           suggestion.link,
           suggestion.notes,
           suggestion.createdAt,
-          suggestion.votes,
           suggestion.totalPoints,
           suggestion.voters
         )
@@ -139,37 +134,6 @@ export class Suggestion {
     // Check if the user exists in any suggestion's voters array for this cycle
     return suggestions.some((suggestion) =>
       suggestion.voters?.includes(userId)
-    );
-  }
-
-  /**
-   * Update the votes for this suggestion
-   */
-  public async addVote(): Promise<Suggestion> {
-    const db = await connectToDatabase();
-    const newVoteCount = this.votes + 1;
-
-    const modifiedCount = await updateSuggestion(db, {
-      _id: this.id,
-      votes: newVoteCount,
-    });
-
-    if (modifiedCount === 0) {
-      throw new Error("Failed to update vote count. Please try again.");
-    }
-
-    return new Suggestion(
-      this.id,
-      this.cycleId,
-      this.userId,
-      this.bookName,
-      this.author,
-      this.link,
-      this.notes,
-      this.createdAt,
-      newVoteCount,
-      this.totalPoints,
-      this.voters
     );
   }
 
@@ -205,7 +169,6 @@ export class Suggestion {
       this.link,
       this.notes,
       this.createdAt,
-      this.votes,
       newTotalPoints,
       newVoters
     );
@@ -251,10 +214,6 @@ export class Suggestion {
 
   public getCreatedAt() {
     return this.createdAt;
-  }
-
-  public getVotes() {
-    return this.votes;
   }
 
   public getTotalPoints() {

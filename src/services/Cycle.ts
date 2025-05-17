@@ -9,7 +9,6 @@ import {
 import { getPhaseConfig } from "../config";
 import type {
   TCycleStatus,
-  TCycleStats,
   TPhaseDurations,
   TPhaseTimings,
   TCycle,
@@ -26,7 +25,6 @@ export class Cycle {
     private readonly name: string,
     private readonly startDate: Date,
     private readonly status: TCycleStatus,
-    private readonly stats: TCycleStats,
     private readonly phaseDurations: TPhaseDurations,
     private readonly currentPhase: TCyclePhase,
     private readonly selectedBookId?: ObjectId,
@@ -61,11 +59,6 @@ export class Cycle {
       currentPhase: "pending",
       startDate: new Date(),
       status: "active",
-      stats: {
-        totalSuggestions: 0,
-        totalVotes: 0,
-        participantCount: 0,
-      },
       phaseDurations: getPhaseConfig(),
     };
 
@@ -78,7 +71,6 @@ export class Cycle {
       defaultCycle.name,
       defaultCycle.startDate,
       defaultCycle.status,
-      defaultCycle.stats,
       defaultCycle.phaseDurations,
       defaultCycle.currentPhase
     );
@@ -101,7 +93,6 @@ export class Cycle {
       cycle.name,
       cycle.startDate,
       cycle.status,
-      cycle.stats,
       cycle.phaseDurations,
       cycle.currentPhase,
       cycle.selectedBookId,
@@ -182,7 +173,6 @@ export class Cycle {
       name || this.name,
       this.startDate,
       status || this.status,
-      this.stats,
       phaseDurations || this.phaseDurations,
       currentPhase || this.currentPhase,
       updatedSelectedBookId,
@@ -225,6 +215,7 @@ export class Cycle {
     return {
       totalSuggestions: suggestions.length,
       totalVotes: allVoters.size,
+      participantCount: allVoters.size, // Align participantCount with totalVotes
     };
   }
 
