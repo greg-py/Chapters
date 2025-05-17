@@ -24,7 +24,9 @@ export class PhaseTransitionService {
 
   constructor(app: App | null, checkIntervalMinutes: number = 60) {
     this.app = app;
-    this.client = app?.client || null;
+    if (app) {
+      this.client = app.client;
+    }
 
     // Use a much shorter check interval if in test mode (every 10 seconds)
     if (process.env.PHASE_TEST_MODE === "true") {
@@ -130,7 +132,6 @@ export class PhaseTransitionService {
           cycleData.name,
           cycleData.startDate,
           cycleData.status,
-          cycleData.stats,
           cycleData.phaseDurations,
           cycleData.currentPhase,
           cycleData.selectedBookId,

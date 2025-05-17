@@ -10,7 +10,6 @@ export const SuggestionSchema = z.object({
   link: z.string(),
   notes: z.string().optional(),
   createdAt: z.date(),
-  votes: z.number().int().min(0).default(0),
   totalPoints: z.number().int().min(0).default(0),
   voters: z.array(z.string()).default([]),
 });
