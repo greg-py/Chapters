@@ -157,6 +157,9 @@ export class PhaseTransitionService {
           continue;
         }
 
+        // Check for notification windows
+        await this.checkNotificationWindows(cycle, calculatedEndDate, now);
+
         // If the calculated end date has passed, transition the phase
         if (now >= calculatedEndDate) {
           phaseChangePromises.push(this.handlePhaseTransition(cycle));
@@ -167,6 +170,120 @@ export class PhaseTransitionService {
     } catch (error) {
       console.error("Error checking phase transitions:", error);
     }
+  }
+
+  /**
+   * Check if we should send deadline notifications
+   */
+  private async checkNotificationWindows(
+    cycle: Cycle,
+    endDate: Date,
+    now: Date
+  ): Promise<void> {
+    if (!this.client) {
+      console.error("Cannot send notifications: client is null");
+      return;
+    }
+
+    const currentPhase = cycle.getCurrentPhase();
+    const phaseTimings = cycle.getPhaseTimings();
+
+    // Skip if we're in pending/discussion phase or if phaseTimings is undefined
+    if (
+      currentPhase === CyclePhase.PENDING ||
+      currentPhase === CyclePhase.DISCUSSION ||
+      !phaseTimings
+    ) {
+      return;
+    }
+
+    const phaseTiming = phaseTimings[currentPhase as keyof typeof phaseTimings];
+    if (!phaseTiming) {
+      return;
+    }
+
+    const timeUntilEnd = endDate.getTime() - now.getTime();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const sevenDaysMs = 7 * oneDayMs;
+
+    // Determine the notification window based on the phase
+    const notificationWindow =
+      currentPhase === CyclePhase.READING ? sevenDaysMs : oneDayMs;
+    const windowLabel =
+      currentPhase === CyclePhase.READING ? "seven days" : "one day";
+
+    // Check if we're in the notification window
+    // For reading phase: between 7-8 days remaining
+    // For other phases: between 1-2 days remaining
+    if (
+      timeUntilEnd <= notificationWindow &&
+      timeUntilEnd > notificationWindow - this.checkIntervalMs
+    ) {
+      // Only send notification if there hasn't been a deadline extension
+      // and we haven't already sent it
+      if (
+        !phaseTiming.extended &&
+        !(
+          "deadlineNotificationSent" in phaseTiming &&
+          phaseTiming.deadlineNotificationSent
+        )
+      ) {
+        await this.sendDeadlineNotification(cycle, windowLabel);
+        // Mark that we've sent the notification
+        await cycle.update({
+          phaseTimings: {
+            ...phaseTimings,
+            [currentPhase]: {
+              ...phaseTiming,
+              deadlineNotificationSent: true,
+            },
+          },
+        });
+      }
+    }
+  }
+
+  /**
+   * Send a deadline notification to the channel
+   */
+  private async sendDeadlineNotification(
+    cycle: Cycle,
+    timeWindow: string
+  ): Promise<void> {
+    if (!this.client) {
+      console.error("Cannot send deadline notification: client is null");
+      return;
+    }
+
+    const channelId = cycle.getChannelId();
+    const currentPhase = cycle.getCurrentPhase();
+    let message = `:warning: *Book Club Phase Deadline Reminder*\n\n`;
+    message += `The "${cycle.getName()}" book club cycle has ${timeWindow} remaining in the *${capitalizeFirstLetter(
+      currentPhase
+    )} Phase*.`;
+
+    // Add phase-specific instructions
+    switch (currentPhase) {
+      case CyclePhase.SUGGESTION:
+        message += `\n\nPlease use \`/chapters-suggest-book\` to add your book suggestions if you haven't already.`;
+        break;
+      case CyclePhase.VOTING:
+        message += `\n\nPlease use \`/chapters-vote\` to cast your vote if you haven't already.`;
+        break;
+      case CyclePhase.READING:
+        message += `\n\nPlease make sure you're on track to finish the book before the discussion phase begins.`;
+        break;
+    }
+
+    // Post notification in the channel
+    await this.client.chat.postMessage({
+      channel: channelId,
+      text: message,
+    });
+
+    console.log(
+      `Sent ${timeWindow} deadline notification for cycle ${cycle.getId()} in ${currentPhase} phase`
+    );
   }
 
   /**
