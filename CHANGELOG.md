@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [3.1.0](https://github.com/greg-py/Chapters/compare/v3.0.2...v3.1.0) (2025-05-19)
+
+
+### Features
+
+* Added phase deadline reminders before automatic phase transition ([f620a1b](https://github.com/greg-py/Chapters/commit/f620a1b74054458781e1fab6909852997f0ebdce))
+
+
+### Chores
+
+* removed unused schema properties and added migration (resolves [#11](https://github.com/greg-py/Chapters/issues/11)) ([41e9d37](https://github.com/greg-py/Chapters/commit/41e9d3736605b9679c0ddb6a441357d5db3e35be))
+
 ### [3.0.2](https://github.com/greg-py/Chapters/compare/v3.0.1...v3.0.2) (2025-05-15)
 
 ### [3.0.1](https://github.com/greg-py/Chapters/compare/v3.0.0...v3.0.1) (2025-05-15)
