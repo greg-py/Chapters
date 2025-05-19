@@ -383,4 +383,86 @@ describe("PhaseTransitionService", () => {
       });
     });
   });
+
+  describe("deadline notifications", () => {
+    it("should send notification when deadlineNotificationSent is not present", async () => {
+      const mockCycle = createMockCycle({
+        getCurrentPhase: vi.fn().mockReturnValue(CyclePhase.SUGGESTION),
+        getPhaseTimings: vi.fn().mockReturnValue({
+          suggestion: {
+            startDate: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000), // 6 days ago
+          },
+        }),
+        calculateCurrentPhaseEndDate: vi.fn().mockReturnValue(
+          new Date(Date.now() + 24 * 60 * 60 * 1000) // 1 day from now
+        ),
+      });
+
+      // @ts-ignore - accessing private method for testing
+      await service.checkNotificationWindows(
+        mockCycle,
+        new Date(Date.now() + 24 * 60 * 60 * 1000),
+        new Date()
+      );
+
+      expect(mockClient.chat.postMessage).toHaveBeenCalled();
+      expect(mockCycle.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          phaseTimings: expect.objectContaining({
+            suggestion: expect.objectContaining({
+              deadlineNotificationSent: true,
+            }),
+          }),
+        })
+      );
+    });
+
+    it("should send notification when deadlineNotificationSent is false", async () => {
+      const mockCycle = createMockCycle({
+        getCurrentPhase: vi.fn().mockReturnValue(CyclePhase.SUGGESTION),
+        getPhaseTimings: vi.fn().mockReturnValue({
+          suggestion: {
+            startDate: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+            deadlineNotificationSent: false,
+          },
+        }),
+        calculateCurrentPhaseEndDate: vi
+          .fn()
+          .mockReturnValue(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+      });
+
+      // @ts-ignore - accessing private method for testing
+      await service.checkNotificationWindows(
+        mockCycle,
+        new Date(Date.now() + 24 * 60 * 60 * 1000),
+        new Date()
+      );
+
+      expect(mockClient.chat.postMessage).toHaveBeenCalled();
+    });
+
+    it("should not send notification when deadlineNotificationSent is true", async () => {
+      const mockCycle = createMockCycle({
+        getCurrentPhase: vi.fn().mockReturnValue(CyclePhase.SUGGESTION),
+        getPhaseTimings: vi.fn().mockReturnValue({
+          suggestion: {
+            startDate: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+            deadlineNotificationSent: true,
+          },
+        }),
+        calculateCurrentPhaseEndDate: vi
+          .fn()
+          .mockReturnValue(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+      });
+
+      // @ts-ignore - accessing private method for testing
+      await service.checkNotificationWindows(
+        mockCycle,
+        new Date(Date.now() + 24 * 60 * 60 * 1000),
+        new Date()
+      );
+
+      expect(mockClient.chat.postMessage).not.toHaveBeenCalled();
+    });
+  });
 });
