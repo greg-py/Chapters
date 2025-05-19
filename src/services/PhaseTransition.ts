@@ -223,10 +223,8 @@ export class PhaseTransitionService {
       // and we haven't already sent it
       if (
         !phaseTiming.extended &&
-        !(
-          "deadlineNotificationSent" in phaseTiming &&
-          phaseTiming.deadlineNotificationSent
-        )
+        (!("deadlineNotificationSent" in phaseTiming) ||
+          !phaseTiming.deadlineNotificationSent)
       ) {
         await this.sendDeadlineNotification(cycle, windowLabel);
         // Mark that we've sent the notification

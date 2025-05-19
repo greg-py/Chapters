@@ -80,7 +80,26 @@ This will:
 
 - `npm run dev:build` - Rebuild and start the development environment
 - `npm run dev:down` - Stop the development environment
+- `npm run dev:phasetest` - Start the phase testing environment
 - `npm run dev:phasetest:build` - Rebuild and start the phase testing environment
+
+#### Testing Commands
+
+- `npm run test` - Run all tests once
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Run tests with coverage report
+
+#### Release Commands
+
+- `npm run release` - Create a new release
+- `npm run release:alpha` - Create an alpha pre-release
+- `npm run release:beta` - Create a beta pre-release
+- `npm run release:rc` - Create a release candidate
+
+#### Database Commands
+
+- `npm run migrate` - Run database migrations
+- `npm run migrate:rollback` - Rollback the last migration
 
 ### Development vs Production
 
