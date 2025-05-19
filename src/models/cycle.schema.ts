@@ -20,18 +20,25 @@ export const PhaseTimingsSchema = z.object({
   suggestion: z.object({
     startDate: z.date().optional(),
     endDate: z.date().optional(),
+    extended: z.boolean().optional(),
+    deadlineNotificationSent: z.boolean().optional(),
   }),
   voting: z.object({
     startDate: z.date().optional(),
     endDate: z.date().optional(),
+    extended: z.boolean().optional(),
+    deadlineNotificationSent: z.boolean().optional(),
   }),
   reading: z.object({
     startDate: z.date().optional(),
     endDate: z.date().optional(),
+    extended: z.boolean().optional(),
+    deadlineNotificationSent: z.boolean().optional(),
   }),
   discussion: z.object({
     startDate: z.date().optional(),
     endDate: z.date().optional(),
+    extended: z.boolean().optional(),
   }),
 });
 
