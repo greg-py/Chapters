@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [3.1.1](https://github.com/greg-py/Chapters/compare/v3.1.0...v3.1.1) (2025-05-19)
+
+
+### Bug Fixes
+
+* Resolved issue with phase deadline warning not running in certain cases ([f637f8f](https://github.com/greg-py/Chapters/commit/f637f8f69edc4ee51b895b20a0dc3a043e5ae620))
+
+
+### Chores
+
+* add coverage directory to gitignore ([31180c9](https://github.com/greg-py/Chapters/commit/31180c9bbdb4e5133a5cfdf37190bdcf73693fd6))
+* Adds foundation for unit test coverage and action to run and require on PRs (closes [#12](https://github.com/greg-py/Chapters/issues/12)) ([2345d4e](https://github.com/greg-py/Chapters/commit/2345d4ea5de456b2570865b8ece6f92d09a4fff9))
+
 ## [3.1.0](https://github.com/greg-py/Chapters/compare/v3.0.2...v3.1.0) (2025-05-19)
 
 
