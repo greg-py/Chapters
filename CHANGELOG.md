@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [3.1.4](https://github.com/greg-py/Chapters/compare/v3.1.3...v3.1.4) (2025-05-20)
+
+
+### Bug Fixes
+
+* Update serverless function call to daily ([1d8e7b5](https://github.com/greg-py/Chapters/commit/1d8e7b5fccdfd59818465e80776e0baad9162cf4))
+
 ### [3.1.3](https://github.com/greg-py/Chapters/compare/v3.1.2...v3.1.3) (2025-05-20)
 
 
