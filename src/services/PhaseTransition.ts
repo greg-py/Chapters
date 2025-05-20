@@ -28,10 +28,10 @@ export class PhaseTransitionService {
     this.app = app;
     if (app) {
       this.client = app.client;
-    } else if (process.env.SLACK_BOT_TOKEN) {
+    } else if (process.env.SLACK_APP_BOT_TOKEN) {
       // Initialize WebClient directly if we have a token but no app
       // This is necessary for serverless environments like Vercel CRON
-      this.client = new WebClient(process.env.SLACK_BOT_TOKEN);
+      this.client = new WebClient(process.env.SLACK_APP_BOT_TOKEN);
       console.log("Initialized WebClient directly for serverless execution");
     }
 
@@ -88,8 +88,8 @@ export class PhaseTransitionService {
    * This is important for serverless environments where the client might not be initialized.
    */
   private ensureClient(): boolean {
-    if (!this.client && process.env.SLACK_BOT_TOKEN) {
-      this.client = new WebClient(process.env.SLACK_BOT_TOKEN);
+    if (!this.client && process.env.SLACK_APP_BOT_TOKEN) {
+      this.client = new WebClient(process.env.SLACK_APP_BOT_TOKEN);
       console.log("Initialized WebClient on-demand for serverless execution");
       return true;
     }
