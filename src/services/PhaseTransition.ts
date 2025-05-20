@@ -114,15 +114,21 @@ export class PhaseTransitionService {
    */
   private async checkPhaseTransitions(): Promise<void> {
     try {
+      console.log("🔄 Running phase transition check...");
+
       // Get all active cycles using the DTO function
       const db = await connectToDatabase();
       const activeCycles = await getAllActiveCycles(db);
+
+      console.log(`📚 Found ${activeCycles.length} active cycles`);
 
       if (activeCycles.length === 0) {
         return;
       }
 
       const now = new Date();
+      console.log(`⏰ Current time: ${now.toISOString()}`);
+
       const phaseChangePromises: Promise<void>[] = [];
 
       for (const cycleData of activeCycles) {
@@ -138,37 +144,85 @@ export class PhaseTransitionService {
           cycleData.phaseTimings
         );
 
+        console.log(
+          `\n🔍 Checking cycle: ${cycle.getName()} (${cycle.getId()})`
+        );
+        console.log(`  • Current phase: ${cycle.getCurrentPhase()}`);
+
         // Skip pending cycles
         if (cycle.getCurrentPhase() === CyclePhase.PENDING) {
+          console.log(`  • Skipping: Cycle is in PENDING phase`);
           continue;
         }
 
         // If the phase has no start date, set it now
         if (!cycle.getCurrentPhaseStartDate()) {
+          console.log(
+            `  • Setting start date for phase: ${cycle.getCurrentPhase()}`
+          );
           await cycle.setCurrentPhaseStartDate();
           continue;
         }
 
-        // Calculate when the phase should end based on the start date and duration
-        const calculatedEndDate = cycle.calculateCurrentPhaseEndDate();
+        const phaseStartDate = cycle.getCurrentPhaseStartDate();
+        console.log(`  • Phase start date: ${phaseStartDate?.toISOString()}`);
 
-        // If there's no calculated end date, skip
-        if (!calculatedEndDate) {
-          continue;
-        }
+        // Get the duration for the current phase
+        const phaseDurations = cycle.getPhaseDurations();
+        const currentPhaseKey =
+          cycle.getCurrentPhase() as keyof typeof phaseDurations;
+        const phaseDuration = phaseDurations[currentPhaseKey];
+        console.log(`  • Phase duration: ${phaseDuration} days`);
 
-        // Check for notification windows
-        await this.checkNotificationWindows(cycle, calculatedEndDate, now);
+        // Calculate the expected end date directly from start date + duration
+        if (phaseStartDate) {
+          const expectedEndDate = new Date(phaseStartDate);
 
-        // If the calculated end date has passed, transition the phase
-        if (now >= calculatedEndDate) {
-          phaseChangePromises.push(this.handlePhaseTransition(cycle));
+          // In test mode, use minutes instead of days
+          if (process.env.PHASE_TEST_MODE === "true") {
+            expectedEndDate.setMinutes(
+              expectedEndDate.getMinutes() + phaseDuration
+            );
+          } else {
+            expectedEndDate.setDate(expectedEndDate.getDate() + phaseDuration);
+          }
+
+          console.log(
+            `  • Expected phase end date: ${expectedEndDate.toISOString()}`
+          );
+          console.log(
+            `  • Should transition? ${now >= expectedEndDate ? "YES" : "NO"}`
+          );
+
+          // Check for notification windows
+          await this.checkNotificationWindows(cycle, expectedEndDate, now);
+
+          // If the expected end date has passed, transition the phase
+          if (now >= expectedEndDate) {
+            console.log(`  • 🚨 Phase end date has passed, transitioning...`);
+            phaseChangePromises.push(this.handlePhaseTransition(cycle));
+          } else {
+            const timeRemaining = expectedEndDate.getTime() - now.getTime();
+            const daysRemaining = Math.ceil(
+              timeRemaining / (1000 * 60 * 60 * 24)
+            );
+            console.log(`  • Time remaining: ~${daysRemaining} days`);
+          }
+        } else {
+          console.log(`  • ERROR: Unable to determine phase start date`);
         }
       }
 
-      await Promise.allSettled(phaseChangePromises);
+      if (phaseChangePromises.length > 0) {
+        console.log(
+          `🔄 Executing ${phaseChangePromises.length} phase transitions...`
+        );
+        await Promise.allSettled(phaseChangePromises);
+      } else {
+        console.log(`✅ No cycles ready for phase transition`);
+      }
     } catch (error) {
-      console.error("Error checking phase transitions:", error);
+      console.error("❌ Error checking phase transitions:", error);
     }
   }
 
@@ -290,9 +344,12 @@ export class PhaseTransitionService {
   private async handlePhaseTransition(cycle: Cycle): Promise<void> {
     try {
       const currentPhase = cycle.getCurrentPhase();
+      console.log(`🔄 Handling phase transition for cycle ${cycle.getId()}`);
+      console.log(`  • Current phase: ${currentPhase}`);
 
       // Special handling for discussion phase ending - complete the cycle
       if (currentPhase === CyclePhase.DISCUSSION) {
+        console.log(`  • Discussion phase ending, completing cycle`);
         await this.completeCycle(cycle);
         return;
       }
@@ -300,20 +357,27 @@ export class PhaseTransitionService {
       // For all other phases, continue with normal transition logic
       // Get the next phase
       const nextPhase = this.getNextPhase(currentPhase);
+      console.log(`  • Next phase: ${nextPhase}`);
 
       // Check if the phase transition is valid
+      console.log(`  • Validating transition to ${nextPhase}...`);
       const isValid = await this.validatePhaseTransition(cycle, nextPhase);
+      console.log(
+        `  • Transition validation result: ${isValid ? "VALID" : "INVALID"}`
+      );
 
       if (isValid) {
         // Perform the phase transition
+        console.log(`  • Performing transition to ${nextPhase}`);
         await this.transitionPhase(cycle, nextPhase);
       } else {
         // Phase transition is not valid, notify about the issue
+        console.log(`  • Cannot transition, sending notification`);
         await this.notifyInvalidTransition(cycle, nextPhase);
       }
     } catch (error) {
       console.error(
-        `Error handling phase transition for cycle ${cycle.getId()}:`,
+        `❌ Error handling phase transition for cycle ${cycle.getId()}:`,
         error
       );
     }
@@ -329,12 +393,21 @@ export class PhaseTransitionService {
     const currentPhase = cycle.getCurrentPhase();
     const suggestions = await Suggestion.getAllForCycle(cycle.getId());
 
+    console.log(
+      `  • Validating transition from ${currentPhase} to ${nextPhase}`
+    );
+    console.log(`  • Number of suggestions: ${suggestions.length}`);
+    console.log(`  • Selected book ID: ${cycle.getSelectedBookId() || "NONE"}`);
+
     // RULE 1: If currently in suggestion phase, need at least 3 suggestions to move on
     if (
       currentPhase === CyclePhase.SUGGESTION &&
       nextPhase !== CyclePhase.SUGGESTION &&
       suggestions.length < 3
     ) {
+      console.log(
+        `  • ❌ RULE 1 FAILED: Not enough suggestions (${suggestions.length} < 3)`
+      );
       return false;
     }
 
@@ -344,14 +417,28 @@ export class PhaseTransitionService {
         nextPhase === CyclePhase.DISCUSSION) &&
       !cycle.getSelectedBookId()
     ) {
+      console.log(
+        `  • ⚠️ RULE 2 CHECK: No selected book for ${nextPhase} phase`
+      );
+
       // If in voting phase, could try to auto-select the winning book
       if (currentPhase === CyclePhase.VOTING) {
+        console.log(`  • Attempting to auto-select a winning book...`);
         // Try to automatically select the winner
-        return await this.autoSelectWinner(cycle);
+        const success = await this.autoSelectWinner(cycle);
+        console.log(
+          `  • Auto-select winner result: ${success ? "SUCCESS" : "FAILED"}`
+        );
+        return success;
       }
+
+      console.log(
+        `  • ❌ RULE 2 FAILED: No selected book and not in voting phase`
+      );
       return false;
     }
 
+    console.log(`  • ✅ All validation rules passed`);
     return true;
   }
 
@@ -360,10 +447,15 @@ export class PhaseTransitionService {
    */
   private async autoSelectWinner(cycle: Cycle): Promise<boolean> {
     try {
+      console.log(
+        `    • Attempting to auto-select winner for cycle ${cycle.getId()}`
+      );
       const suggestions = await Suggestion.getAllForCycle(cycle.getId());
+      console.log(`    • Found ${suggestions.length} suggestions`);
 
       // Need at least some suggestions to select a winner
       if (suggestions.length === 0) {
+        console.log(`    • ❌ No suggestions available`);
         return false;
       }
 
@@ -373,37 +465,51 @@ export class PhaseTransitionService {
         const voters = suggestion.getVoters();
         voters.forEach((voter) => voterSet.add(voter));
       });
+      console.log(`    • Total unique voters: ${voterSet.size}`);
 
       // Need at least some votes to select a winner
       if (voterSet.size === 0) {
+        console.log(`    • ❌ No votes have been cast`);
         return false;
       }
 
       // Tally the votes
       const voteTallies = this.tallyVotesForCycle(suggestions);
+      console.log(`    • Vote tally results: ${JSON.stringify(voteTallies)}`);
 
       if (voteTallies.length === 0) {
+        console.log(`    • ❌ No tallied votes available`);
         return false;
       }
 
       // Find the winner (first place in ranked choice voting)
       const winningBookId = voteTallies[0].suggestionId;
+      console.log(`    • Winning book ID: ${winningBookId}`);
+
       const winnerSuggestion = suggestions.find((s) =>
         s.getId().equals(winningBookId)
       );
 
       if (!winnerSuggestion) {
+        console.log(
+          `    • ❌ Could not find winning suggestion in suggestions list`
+        );
         return false;
       }
+
+      console.log(
+        `    • Selected winner: "${winnerSuggestion.getBookName()}" by ${winnerSuggestion.getAuthor()}`
+      );
 
       // Update the cycle with the selected book
       await cycle.update({
         selectedBookId: winningBookId,
       });
+      console.log(`    • ✅ Updated cycle with selected book ID`);
 
       return true;
     } catch (error) {
-      console.error("Error auto-selecting winner:", error);
+      console.error("❌ Error auto-selecting winner:", error);
       return false;
     }
   }
