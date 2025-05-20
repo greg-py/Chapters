@@ -1,6 +1,7 @@
 // Serverless endpoint for Vercel CRON job to trigger phase transitions
 const { PhaseTransitionService } = require("../dist/services/PhaseTransition");
 const { connectToDatabase } = require("../dist/db");
+const { WebClient } = require("@slack/web-api");
 
 module.exports = async (req, res) => {
   // Verify this is coming from Vercel Cron
@@ -17,8 +18,16 @@ module.exports = async (req, res) => {
     await connectToDatabase();
     console.log("✅ Database connection established");
 
-    // Get singleton instance of the service
+    // Explicitly initialize the Slack WebClient
+    if (!process.env.SLACK_BOT_TOKEN) {
+      throw new Error("SLACK_BOT_TOKEN environment variable is not set");
+    }
+    const webClient = new WebClient(process.env.SLACK_BOT_TOKEN);
+    console.log("✅ Slack WebClient initialized successfully");
+
+    // Get singleton instance of the service and explicitly pass the WebClient
     const phaseTransitionService = PhaseTransitionService.getInstance(null);
+    phaseTransitionService.setWebClient(webClient);
 
     // Trigger a single check
     await phaseTransitionService.triggerCheck();
