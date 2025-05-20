@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [3.1.6](https://github.com/greg-py/Chapters/compare/v3.1.5...v3.1.6) (2025-05-20)
+
+
+### Bug Fixes
+
+* updated vercel json to include cron route ([4a78705](https://github.com/greg-py/Chapters/commit/4a78705b280cdd2aa6e26f9f1bfcfe8db73a5952))
+
 ### [3.1.5](https://github.com/greg-py/Chapters/compare/v3.1.4...v3.1.5) (2025-05-20)
 
 
