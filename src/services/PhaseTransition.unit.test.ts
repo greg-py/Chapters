@@ -13,9 +13,19 @@ vi.mock("../dto", () => ({
   getCycleById: vi.fn(),
 }));
 
+// Mock WebClient
+vi.mock("@slack/web-api", () => ({
+  WebClient: vi.fn().mockImplementation(() => ({
+    chat: {
+      postMessage: vi.fn().mockResolvedValue({ ok: true }),
+    },
+  })),
+}));
+
 // Import after mocking to avoid circular dependencies
 import { Cycle, Suggestion } from "./";
 import * as dtoModule from "../dto";
+import { WebClient } from "@slack/web-api";
 
 // Create mock cycle factory to be consistent across tests
 const createMockCycle = (overrides = {}) => {
@@ -121,8 +131,64 @@ describe("PhaseTransitionService", () => {
     });
   });
 
+  describe("serverless mode initialization", () => {
+    it("should initialize WebClient directly when SLACK_BOT_TOKEN is available but no app", () => {
+      process.env.SLACK_BOT_TOKEN = "test-token";
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      const serverlessService = new PhaseTransitionService(null);
+
+      expect(WebClient).toHaveBeenCalledWith("test-token");
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "Initialized WebClient directly for serverless execution"
+        )
+      );
+    });
+
+    it("should initialize client on-demand with ensureClient method", () => {
+      process.env.SLACK_BOT_TOKEN = "test-token";
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      // Create service instance
+      const serverlessService = new PhaseTransitionService(null);
+
+      // Explicitly set client to null to force ensureClient to create a new one
+      // @ts-ignore - accessing private property for testing
+      serverlessService.client = null;
+
+      // Reset the mock to clear previous calls
+      vi.mocked(WebClient).mockClear();
+
+      // @ts-ignore - accessing private method for testing
+      const result = serverlessService.ensureClient();
+
+      expect(result).toBe(true);
+      expect(WebClient).toHaveBeenCalledWith("test-token");
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "Initialized WebClient on-demand for serverless execution"
+        )
+      );
+    });
+
+    it("should return false from ensureClient when no token is available", () => {
+      process.env.SLACK_BOT_TOKEN = undefined;
+
+      const serverlessService = new PhaseTransitionService(null);
+      vi.mocked(WebClient).mockClear();
+
+      // @ts-ignore - accessing private method for testing
+      const result = serverlessService.ensureClient();
+
+      expect(result).toBe(false);
+      expect(WebClient).not.toHaveBeenCalled();
+    });
+  });
+
   describe("start and stop", () => {
-    it("should not start if app is not set", () => {
+    it("should not start if client cannot be initialized", () => {
+      process.env.SLACK_BOT_TOKEN = undefined;
       const service = new PhaseTransitionService(null);
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
@@ -131,7 +197,7 @@ describe("PhaseTransitionService", () => {
       service.start();
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        "Cannot start PhaseTransitionService: App instance not set"
+        "Cannot start PhaseTransitionService: Unable to initialize Slack client"
       );
     });
 

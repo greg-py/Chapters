@@ -119,6 +119,32 @@ The application has two distinct environments that share the same codebase:
 - Uses HTTP Mode (requires public URL)
 - Uses MongoDB Atlas or similar cloud database
 - Runs in production mode with optimized settings
+- Utilizes Vercel CRON for automated phase transitions
+
+## Automatic Phase Transitions
+
+The application includes an automatic phase transition system that moves book clubs through different phases based on configured durations.
+
+### Phase Transition Architecture
+
+- **Development Environment**: Uses continuous interval checking via `setInterval`
+- **Production Environment**: Uses Vercel CRON jobs that run hourly to check and perform phase transitions
+
+The PhaseTransitionService has been designed to work in both environments:
+
+- In local development, it uses a timer-based approach with configurable intervals
+- In production (Vercel), it uses a serverless-compatible approach triggered by CRON jobs
+
+### Vercel CRON Configuration
+
+In production, phase transitions are handled by a Vercel CRON job that:
+
+- Runs hourly via the `/api/cron-phase-transition` endpoint
+- Checks all active cycles for phase transition eligibility
+- Performs transitions and sends notifications automatically
+- Requires no long-running processes or timers
+
+This serverless approach ensures reliable phase transitions even in environments that don't support background processes.
 
 ## Command Reference
 

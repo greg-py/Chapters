@@ -132,8 +132,19 @@ export async function initializeServices(app: App) {
 
     // Initialize and start the Phase Transition Service with the proper app instance
     phaseTransitionService.setApp(app);
-    phaseTransitionService.start();
-    console.log("✅ Phase transition service started");
+
+    // Only start continuous checking if not in a serverless environment
+    // This is to prevent Vercel from running background processes
+    // Instead, we'll use Vercel CRON for scheduled checks
+    const isServerless = process.env.VERCEL === "1";
+    if (!isServerless) {
+      phaseTransitionService.start();
+      console.log("✅ Phase transition service started (continuous mode)");
+    } else {
+      console.log(
+        "ℹ️ Phase transition service initialized but not started in continuous mode (using Vercel CRON instead)"
+      );
+    }
 
     console.log("✅ All services initialized successfully");
 
