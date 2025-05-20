@@ -166,6 +166,7 @@ Once configured:
    which are automatically compiled during deployment.
 
 4. **Configure Slack App for HTTP Mode**:
+
    1. Set the Request URLs in your Slack app dashboard:
       - **Event Subscriptions**: `https://your-app-name.vercel.app/slack/events`
       - **Interactivity & Shortcuts**: `https://your-app-name.vercel.app/slack/interactions`
@@ -173,6 +174,26 @@ Once configured:
    2. Subscribe to Bot Events under Event Subscriptions:
       - `app_mention`
       - Any other events your app needs to handle
+
+5. **Verify CRON Job Configuration**:
+
+   The application uses Vercel CRON jobs to handle automatic phase transitions. This is configured in the `vercel.json` file:
+
+   ```json
+   "crons": [
+     {
+       "path": "/api/cron-phase-transition",
+       "schedule": "0 * * * *"
+     }
+   ]
+   ```
+
+   This configuration:
+
+   - Runs hourly (at minute 0 of every hour)
+   - Calls the `/api/cron-phase-transition` endpoint
+   - Automatically performs phase transitions when needed
+   - No additional setup is required as this is built into the Vercel deployment
 
 ### Application Architecture
 
@@ -218,8 +239,13 @@ This modular structure makes the codebase more maintainable and easier to extend
    - Production: Optimized for performance and reliability
 
 5. **Testing**:
+
    - Development: Includes phase testing mode
    - Production: No testing modes available
+
+6. **Phase Transitions**:
+   - Development: Continuous timer-based checking via `setInterval`
+   - Production: Serverless approach using Vercel CRON jobs that run hourly
 
 ### Version Management
 
@@ -255,6 +281,13 @@ This ensures consistent version reporting in both development and production.
    - Ensure MongoDB Atlas connection is working
 
 2. **Slack Integration Issues**:
+
    - Verify Request URLs are correct
    - Check if Socket Mode is disabled
    - Ensure all required scopes are enabled
+
+3. **CRON Job Issues**:
+   - Verify the CRON job is properly configured in `vercel.json`
+   - Check Vercel logs for the CRON job execution (`/api/cron-phase-transition`)
+   - Ensure the Slack bot token has the required permissions
+   - Check that the MongoDB connection is working in the serverless environment

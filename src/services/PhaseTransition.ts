@@ -14,6 +14,8 @@ interface VoteTally {
 
 /**
  * Service to manage automatic phase transitions based on configured durations
+ * This service can be run either via continuous interval (local) or
+ * via Vercel CRON jobs (production)
  */
 export class PhaseTransitionService {
   private intervalId: NodeJS.Timeout | null = null;
@@ -26,6 +28,11 @@ export class PhaseTransitionService {
     this.app = app;
     if (app) {
       this.client = app.client;
+    } else if (process.env.SLACK_BOT_TOKEN) {
+      // Initialize WebClient directly if we have a token but no app
+      // This is necessary for serverless environments like Vercel CRON
+      this.client = new WebClient(process.env.SLACK_BOT_TOKEN);
+      console.log("Initialized WebClient directly for serverless execution");
     }
 
     // Use a much shorter check interval if in test mode (every 10 seconds)
@@ -68,11 +75,39 @@ export class PhaseTransitionService {
   }
 
   /**
+   * Initialize WebClient if not already set.
+   * This is important for serverless environments where the client might not be initialized.
+   */
+  private ensureClient(): boolean {
+    if (!this.client && process.env.SLACK_BOT_TOKEN) {
+      this.client = new WebClient(process.env.SLACK_BOT_TOKEN);
+      console.log("Initialized WebClient on-demand for serverless execution");
+      return true;
+    }
+    return !!this.client;
+  }
+
+  /**
+   * Get the initialized client or throw an error
+   */
+  private getClient(): WebClient {
+    if (!this.client) {
+      if (!this.ensureClient()) {
+        throw new Error("Failed to initialize Slack client");
+      }
+    }
+    return this.client!;
+  }
+
+  /**
    * Start the automatic phase transition service
+   * This is used for continuous checking in non-serverless environments
    */
   public start(): void {
-    if (!this.app || !this.client) {
-      console.warn("Cannot start PhaseTransitionService: App instance not set");
+    if (!this.ensureClient()) {
+      console.warn(
+        "Cannot start PhaseTransitionService: Unable to initialize Slack client"
+      );
       return;
     }
 
@@ -234,8 +269,10 @@ export class PhaseTransitionService {
     endDate: Date,
     now: Date
   ): Promise<void> {
-    if (!this.client) {
-      console.error("Cannot send notifications: client is null");
+    if (!this.ensureClient()) {
+      console.error(
+        "Cannot send notifications: Failed to initialize Slack client"
+      );
       return;
     }
 
@@ -302,8 +339,10 @@ export class PhaseTransitionService {
     cycle: Cycle,
     timeWindow: string
   ): Promise<void> {
-    if (!this.client) {
-      console.error("Cannot send deadline notification: client is null");
+    if (!this.ensureClient()) {
+      console.error(
+        "Cannot send deadline notification: Failed to initialize Slack client"
+      );
       return;
     }
 
@@ -328,7 +367,7 @@ export class PhaseTransitionService {
     }
 
     // Post notification in the channel
-    await this.client.chat.postMessage({
+    await this.getClient().chat.postMessage({
       channel: channelId,
       text: message,
     });
@@ -549,8 +588,10 @@ export class PhaseTransitionService {
     cycle: Cycle,
     nextPhase: CyclePhase
   ): Promise<void> {
-    if (!this.client) {
-      console.error("Cannot notify phase transition: client is null");
+    if (!this.ensureClient()) {
+      console.error(
+        "Cannot notify phase transition: Failed to initialize Slack client"
+      );
       return;
     }
 
@@ -657,7 +698,7 @@ export class PhaseTransitionService {
     }
 
     // Post announcement in the channel
-    await this.client.chat.postMessage({
+    await this.getClient().chat.postMessage({
       channel: channelId,
       text: announcementMsg,
     });
@@ -675,8 +716,10 @@ export class PhaseTransitionService {
     cycle: Cycle,
     attemptedPhase: CyclePhase
   ): Promise<void> {
-    if (!this.client) {
-      console.error("Cannot notify invalid transition: client is null");
+    if (!this.ensureClient()) {
+      console.error(
+        "Cannot notify invalid transition: Failed to initialize Slack client"
+      );
       return;
     }
 
@@ -695,7 +738,7 @@ export class PhaseTransitionService {
     )} phase.`;
 
     // Post notification in the channel
-    await this.client.chat.postMessage({
+    await this.getClient().chat.postMessage({
       channel: channelId,
       text: message,
     });
@@ -756,13 +799,15 @@ export class PhaseTransitionService {
    * Notify the channel about a cycle completion
    */
   private async notifyCycleCompletion(cycle: Cycle): Promise<void> {
-    if (!this.client) {
-      console.error("Cannot notify cycle completion: client is null");
+    if (!this.ensureClient()) {
+      console.error(
+        "Cannot notify cycle completion: Failed to initialize Slack client"
+      );
       return;
     }
 
     const channelId = cycle.getChannelId();
-    await this.client.chat.postMessage({
+    await this.getClient().chat.postMessage({
       channel: channelId,
       text: `:tada: *Book Club Cycle Completed!*\n\nThe book club cycle "${cycle.getName()}" has been completed and archived.\n\nTo start a new book club cycle, use the \`/chapters-start-cycle\` command.`,
     });

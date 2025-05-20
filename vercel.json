@@ -28,5 +28,11 @@
   },
   "git": {
     "deploymentEnabled": false
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron-phase-transition",
+      "schedule": "0 * * * *"
+    }
+  ]
 }
