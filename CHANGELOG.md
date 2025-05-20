@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [3.1.5](https://github.com/greg-py/Chapters/compare/v3.1.4...v3.1.5) (2025-05-20)
+
+
+### Bug Fixes
+
+* updated return of express app for serverless ([cc33fd8](https://github.com/greg-py/Chapters/commit/cc33fd801bbf4e02b8b59a089c5b4e75b8a9e65a))
+
 ### [3.1.4](https://github.com/greg-py/Chapters/compare/v3.1.3...v3.1.4) (2025-05-20)
 
 
