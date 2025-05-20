@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [3.1.2](https://github.com/greg-py/Chapters/compare/v3.1.1...v3.1.2) (2025-05-20)
+
+
+### Chores
+
+* Added logging for phase transition service ([777b00b](https://github.com/greg-py/Chapters/commit/777b00ba0c177dc5635e9e79b9e8cf7050965fb7))
+
 ### [3.1.1](https://github.com/greg-py/Chapters/compare/v3.1.0...v3.1.1) (2025-05-19)
 
 
