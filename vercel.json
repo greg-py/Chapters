@@ -32,7 +32,7 @@
   "crons": [
     {
       "path": "/api/cron-phase-transition",
-      "schedule": "0 * * * *"
+      "schedule": "30 17 * * *"
     }
   ]
 }
