@@ -19,10 +19,10 @@ module.exports = async (req, res) => {
     console.log("✅ Database connection established");
 
     // Explicitly initialize the Slack WebClient
-    if (!process.env.SLACK_BOT_TOKEN) {
-      throw new Error("SLACK_BOT_TOKEN environment variable is not set");
+    if (!process.env.SLACK_APP_BOT_TOKEN) {
+      throw new Error("SLACK_APP_BOT_TOKEN environment variable is not set");
     }
-    const webClient = new WebClient(process.env.SLACK_BOT_TOKEN);
+    const webClient = new WebClient(process.env.SLACK_APP_BOT_TOKEN);
     console.log("✅ Slack WebClient initialized successfully");
 
     // Get singleton instance of the service and explicitly pass the WebClient

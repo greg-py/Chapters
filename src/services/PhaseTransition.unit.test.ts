@@ -132,8 +132,8 @@ describe("PhaseTransitionService", () => {
   });
 
   describe("serverless mode initialization", () => {
-    it("should initialize WebClient directly when SLACK_BOT_TOKEN is available but no app", () => {
-      process.env.SLACK_BOT_TOKEN = "test-token";
+    it("should initialize WebClient directly when SLACK_APP_BOT_TOKEN is available but no app", () => {
+      process.env.SLACK_APP_BOT_TOKEN = "test-token";
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
       const serverlessService = new PhaseTransitionService(null);
@@ -147,7 +147,7 @@ describe("PhaseTransitionService", () => {
     });
 
     it("should initialize client on-demand with ensureClient method", () => {
-      process.env.SLACK_BOT_TOKEN = "test-token";
+      process.env.SLACK_APP_BOT_TOKEN = "test-token";
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
       // Create service instance
@@ -173,7 +173,7 @@ describe("PhaseTransitionService", () => {
     });
 
     it("should return false from ensureClient when no token is available", () => {
-      process.env.SLACK_BOT_TOKEN = undefined;
+      process.env.SLACK_APP_BOT_TOKEN = undefined;
 
       const serverlessService = new PhaseTransitionService(null);
       vi.mocked(WebClient).mockClear();
@@ -188,7 +188,7 @@ describe("PhaseTransitionService", () => {
 
   describe("start and stop", () => {
     it("should not start if client cannot be initialized", () => {
-      process.env.SLACK_BOT_TOKEN = undefined;
+      process.env.SLACK_APP_BOT_TOKEN = undefined;
       const service = new PhaseTransitionService(null);
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
