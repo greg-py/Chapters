@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [3.1.7](https://github.com/greg-py/Chapters/compare/v3.1.6...v3.1.7) (2025-05-20)
+
+
+### Bug Fixes
+
+* added config for slack client in serverless environment ([3b6596e](https://github.com/greg-py/Chapters/commit/3b6596eae1c7d6e390d50498ab0f8821a3fe955a))
+
 ### [3.1.6](https://github.com/greg-py/Chapters/compare/v3.1.5...v3.1.6) (2025-05-20)
 
 
