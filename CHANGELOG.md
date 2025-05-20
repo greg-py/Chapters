@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [3.1.3](https://github.com/greg-py/Chapters/compare/v3.1.2...v3.1.3) (2025-05-20)
+
+
+### Chores
+
+* added configuration for phase transition service in serverless environment ([c4b179a](https://github.com/greg-py/Chapters/commit/c4b179af79b904914d8e03362e3f2d5d43c753c2))
+
 ### [3.1.2](https://github.com/greg-py/Chapters/compare/v3.1.1...v3.1.2) (2025-05-20)
 
 
