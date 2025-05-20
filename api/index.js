@@ -27,6 +27,6 @@ module.exports = async (req, res) => {
     }
   }
 
-  // Forward the request to the Express app
-  return expressApp(req, res);
+  // Forward the request to the Express app using .handle() method
+  return expressApp.handle(req, res);
 };
