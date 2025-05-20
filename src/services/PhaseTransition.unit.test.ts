@@ -169,6 +169,12 @@ describe("PhaseTransitionService", () => {
   });
 
   describe("checkPhaseTransitions", () => {
+    beforeEach(() => {
+      // Mock console to prevent extensive log output during tests
+      vi.spyOn(console, "log").mockImplementation(() => {});
+      vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
     it("should do nothing if no active cycles are found", async () => {
       vi.mocked(dtoModule.getAllActiveCycles).mockResolvedValue([]);
 
@@ -179,12 +185,9 @@ describe("PhaseTransitionService", () => {
     });
 
     it("should check phase transitions for active cycles", async () => {
-      // Mock console to prevent output during tests
-      vi.spyOn(console, "log").mockImplementation(() => {});
-      vi.spyOn(console, "error").mockImplementation(() => {});
-
       // Setup mock cycle data
       const cycleId = new ObjectId();
+      const startDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000); // 10 days ago
       const mockCycleData = {
         _id: cycleId,
         channelId: "channel-123",
@@ -200,7 +203,7 @@ describe("PhaseTransitionService", () => {
         currentPhase: CyclePhase.SUGGESTION,
         phaseTimings: {
           suggestion: {
-            startDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // 10 days ago
+            startDate: startDate, // 10 days ago (past the 7 day duration)
           },
           voting: {},
           reading: {},
@@ -241,21 +244,26 @@ describe("PhaseTransitionService", () => {
       vi.mocked(Suggestion.getAllForCycle).mockResolvedValue(mockSuggestions);
 
       // Create a proper mock cycle
-      const pastDate = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000); // 3 days ago
       const mockCycle = createMockCycle({
         getId: vi.fn().mockReturnValue(cycleId),
         getChannelId: vi.fn().mockReturnValue("channel-123"),
         getName: vi.fn().mockReturnValue("Test Cycle"),
         getCurrentPhase: vi.fn().mockReturnValue(CyclePhase.SUGGESTION),
-        getCurrentPhaseStartDate: vi
-          .fn()
-          .mockReturnValue(new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)),
-        calculateCurrentPhaseEndDate: vi.fn().mockReturnValue(pastDate),
+        getCurrentPhaseStartDate: vi.fn().mockReturnValue(startDate),
+        // We don't need calculateCurrentPhaseEndDate since we now calculate directly
         getPhaseDurations: vi.fn().mockReturnValue({
           suggestion: 7,
           voting: 7,
           reading: 30,
           discussion: 7,
+        }),
+        getPhaseTimings: vi.fn().mockReturnValue({
+          suggestion: {
+            startDate: startDate,
+          },
+          voting: {},
+          reading: {},
+          discussion: {},
         }),
       });
 
@@ -267,7 +275,8 @@ describe("PhaseTransitionService", () => {
 
       // Validate core assertions
       expect(dtoModule.getAllActiveCycles).toHaveBeenCalled();
-      expect(mockCycle.calculateCurrentPhaseEndDate).toHaveBeenCalled();
+      expect(mockCycle.getCurrentPhaseStartDate).toHaveBeenCalled();
+      expect(mockCycle.getPhaseDurations).toHaveBeenCalled();
 
       // Test for method calls that would be made during phase transition
       expect(mockCycle.setCurrentPhaseEndDate).toHaveBeenCalled();
@@ -286,12 +295,12 @@ describe("PhaseTransitionService", () => {
     });
 
     it("should complete a cycle when discussion phase ends", async () => {
-      // Mock console to prevent output during tests
-      vi.spyOn(console, "log").mockImplementation(() => {});
-      vi.spyOn(console, "error").mockImplementation(() => {});
-
       // Setup mock cycle in discussion phase
       const cycleId = new ObjectId();
+      const discussionStartDate = new Date(
+        Date.now() - 10 * 24 * 60 * 60 * 1000
+      ); // 10 days ago
+
       const mockCycleData = {
         _id: cycleId,
         channelId: "channel-123",
@@ -310,7 +319,7 @@ describe("PhaseTransitionService", () => {
           voting: {},
           reading: {},
           discussion: {
-            startDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // 10 days ago
+            startDate: discussionStartDate, // 10 days ago (past the 7 day duration)
           },
         },
         selectedBookId: undefined,
@@ -321,16 +330,26 @@ describe("PhaseTransitionService", () => {
       ]);
 
       // Create a proper mock cycle
-      const pastDate = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000); // 3 days ago
       const mockCycle = createMockCycle({
         getId: vi.fn().mockReturnValue(cycleId),
         getChannelId: vi.fn().mockReturnValue("channel-123"),
         getName: vi.fn().mockReturnValue("Test Cycle"),
         getCurrentPhase: vi.fn().mockReturnValue(CyclePhase.DISCUSSION),
-        getCurrentPhaseStartDate: vi
-          .fn()
-          .mockReturnValue(new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)),
-        calculateCurrentPhaseEndDate: vi.fn().mockReturnValue(pastDate),
+        getCurrentPhaseStartDate: vi.fn().mockReturnValue(discussionStartDate),
+        getPhaseDurations: vi.fn().mockReturnValue({
+          suggestion: 7,
+          voting: 7,
+          reading: 30,
+          discussion: 7,
+        }),
+        getPhaseTimings: vi.fn().mockReturnValue({
+          suggestion: {},
+          voting: {},
+          reading: {},
+          discussion: {
+            startDate: discussionStartDate,
+          },
+        }),
       });
 
       // Replace the default mock with our customized one
@@ -463,6 +482,152 @@ describe("PhaseTransitionService", () => {
       );
 
       expect(mockClient.chat.postMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("calculate expected end date directly from phase start and duration", () => {
+    it("should calculate expected end date directly from phase start and duration", async () => {
+      // Create dates that will trigger a transition
+      const now = new Date();
+      const phaseStartDate = new Date(now);
+      phaseStartDate.setDate(phaseStartDate.getDate() - 8); // 8 days ago (past 7 day duration)
+
+      const mockCycleData = {
+        _id: new ObjectId(),
+        channelId: "channel-123",
+        name: "Test Cycle",
+        startDate: new Date(),
+        status: "active" as CycleStatus,
+        phaseDurations: {
+          suggestion: 7,
+          voting: 7,
+          reading: 30,
+          discussion: 7,
+        },
+        currentPhase: CyclePhase.SUGGESTION,
+        phaseTimings: {
+          suggestion: {
+            startDate: phaseStartDate,
+          },
+          voting: {},
+          reading: {},
+          discussion: {},
+        },
+        selectedBookId: undefined,
+      };
+
+      vi.mocked(dtoModule.getAllActiveCycles).mockResolvedValue([
+        mockCycleData,
+      ]);
+
+      // Create mock cycle with enough suggestions to transition
+      const mockSuggestions = Array(3)
+        .fill(null)
+        .map(() => createMockSuggestion());
+      vi.mocked(Suggestion.getAllForCycle).mockResolvedValue(mockSuggestions);
+
+      // Create mock cycle
+      const mockCycle = createMockCycle({
+        getId: vi.fn().mockReturnValue(mockCycleData._id),
+        getChannelId: vi.fn().mockReturnValue("channel-123"),
+        getName: vi.fn().mockReturnValue("Test Cycle"),
+        getCurrentPhase: vi.fn().mockReturnValue(CyclePhase.SUGGESTION),
+        getCurrentPhaseStartDate: vi.fn().mockReturnValue(phaseStartDate),
+        getPhaseDurations: vi
+          .fn()
+          .mockReturnValue(mockCycleData.phaseDurations),
+        getPhaseTimings: vi.fn().mockReturnValue(mockCycleData.phaseTimings),
+      });
+
+      // Replace the default mock
+      vi.mocked(Cycle).mockImplementation(() => mockCycle);
+
+      // Run the test
+      await service.triggerCheck();
+
+      // Should have attempted to transition to voting phase
+      expect(mockCycle.update).toHaveBeenCalledWith({
+        currentPhase: CyclePhase.VOTING,
+      });
+
+      // Ensure we set end date for current phase
+      expect(mockCycle.setCurrentPhaseEndDate).toHaveBeenCalled();
+    });
+  });
+
+  describe("validatePhaseTransition", () => {
+    beforeEach(() => {
+      // Mock console to prevent extensive log output during tests
+      vi.spyOn(console, "log").mockImplementation(() => {});
+      vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    it("should validate transition from suggestion to voting phase with enough suggestions", async () => {
+      const mockCycle = createMockCycle({
+        getId: vi.fn().mockReturnValue(new ObjectId()),
+        getCurrentPhase: vi.fn().mockReturnValue(CyclePhase.SUGGESTION),
+        getSelectedBookId: vi.fn().mockReturnValue(null),
+      });
+
+      // Create enough suggestions to pass validation
+      const mockSuggestions = Array(3)
+        .fill(null)
+        .map(() => createMockSuggestion());
+      vi.mocked(Suggestion.getAllForCycle).mockResolvedValue(mockSuggestions);
+
+      // @ts-ignore - accessing private method for testing
+      const result = await service.validatePhaseTransition(
+        mockCycle,
+        CyclePhase.VOTING
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it("should invalidate transition from suggestion to voting phase with not enough suggestions", async () => {
+      const mockCycle = createMockCycle({
+        getId: vi.fn().mockReturnValue(new ObjectId()),
+        getCurrentPhase: vi.fn().mockReturnValue(CyclePhase.SUGGESTION),
+        getSelectedBookId: vi.fn().mockReturnValue(null),
+      });
+
+      // Not enough suggestions
+      const mockSuggestions = Array(2)
+        .fill(null)
+        .map(() => createMockSuggestion());
+      vi.mocked(Suggestion.getAllForCycle).mockResolvedValue(mockSuggestions);
+
+      // @ts-ignore - accessing private method for testing
+      const result = await service.validatePhaseTransition(
+        mockCycle,
+        CyclePhase.VOTING
+      );
+
+      expect(result).toBe(false);
+    });
+
+    it("should try to auto-select winner when transitioning to reading phase", async () => {
+      const mockCycle = createMockCycle({
+        getId: vi.fn().mockReturnValue(new ObjectId()),
+        getCurrentPhase: vi.fn().mockReturnValue(CyclePhase.VOTING),
+        getSelectedBookId: vi.fn().mockReturnValue(null),
+      });
+
+      // Mock auto-select winner using defineProperty to avoid TypeScript errors
+      const autoSelectMock = vi.fn().mockResolvedValue(true);
+      Object.defineProperty(service, "autoSelectWinner", {
+        value: autoSelectMock,
+        configurable: true,
+      });
+
+      // @ts-ignore - accessing private method for testing
+      const result = await service.validatePhaseTransition(
+        mockCycle,
+        CyclePhase.READING
+      );
+
+      expect(autoSelectMock).toHaveBeenCalledWith(mockCycle);
+      expect(result).toBe(true);
     });
   });
 });
