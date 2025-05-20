@@ -56,6 +56,15 @@ export class PhaseTransitionService {
   }
 
   /**
+   * Set the WebClient instance directly
+   * This is useful for serverless environments
+   */
+  public setWebClient(client: WebClient): void {
+    this.client = client;
+    console.log("Updated WebClient instance in PhaseTransitionService");
+  }
+
+  /**
    * Get or create the singleton instance of PhaseTransitionService
    */
   public static getInstance(
