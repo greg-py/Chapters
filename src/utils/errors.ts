@@ -126,8 +126,15 @@ export function withActionErrorHandling<
       userId = body.user.id;
     } else if (body.type === "view_submission") {
       userId = body.user.id;
-      // channelId might be in body.view.private_metadata if you passed it
-      // Example: const metadata = JSON.parse(body.view.private_metadata || '{}'); channelId = metadata.channelId;
+      // Extract channelId from private_metadata if available
+      try {
+        if (body.view?.private_metadata) {
+          const metadata = JSON.parse(body.view.private_metadata);
+          channelId = metadata.channelId;
+        }
+      } catch (e) {
+        console.error("Failed to parse view private_metadata:", e);
+      }
     }
     // Add cases for other HandledActionBody types if necessary
 
