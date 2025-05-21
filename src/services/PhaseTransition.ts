@@ -202,6 +202,22 @@ export class PhaseTransitionService {
           continue;
         }
 
+        // Check if we're in the VOTING phase and all members have voted
+        if (cycle.getCurrentPhase() === CyclePhase.VOTING) {
+          console.log(`  • Checking if all channel members have voted...`);
+          const allMembersVoted = await this.haveAllChannelMembersVoted(cycle);
+
+          if (allMembersVoted) {
+            console.log(
+              `  • 🎉 All channel members have voted, transitioning to reading phase...`
+            );
+            phaseChangePromises.push(this.handlePhaseTransition(cycle));
+            continue;
+          } else {
+            console.log(`  • Some channel members haven't voted yet`);
+          }
+        }
+
         const phaseStartDate = cycle.getCurrentPhaseStartDate();
         console.log(`  • Phase start date: ${phaseStartDate?.toISOString()}`);
 
@@ -261,6 +277,101 @@ export class PhaseTransitionService {
       }
     } catch (error) {
       console.error("❌ Error checking phase transitions:", error);
+    }
+  }
+
+  /**
+   * Check if all members in a channel have voted
+   * @param cycle The cycle to check
+   * @returns True if all members have voted, false otherwise
+   */
+  private async haveAllChannelMembersVoted(cycle: Cycle): Promise<boolean> {
+    try {
+      if (!this.ensureClient()) {
+        console.error(
+          "Cannot check channel members: Failed to initialize Slack client"
+        );
+        return false;
+      }
+
+      const channelId = cycle.getChannelId();
+
+      // Get all members in the channel
+      const response = await this.getClient().conversations.members({
+        channel: channelId,
+        limit: 1000, // Use a high limit to get all members
+      });
+
+      if (!response.ok || !response.members || response.members.length === 0) {
+        console.log(`  • Failed to get channel members or channel is empty`);
+        return false;
+      }
+
+      const channelMembers = response.members;
+      console.log(`  • Channel has ${channelMembers.length} members`);
+
+      // Get the suggestions for this cycle
+      const suggestions = await Suggestion.getAllForCycle(cycle.getId());
+
+      // Extract all voters (users who have already voted)
+      const voterSet = new Set<string>();
+      suggestions.forEach((suggestion) => {
+        const voters = suggestion.getVoters();
+        voters.forEach((voter) => voterSet.add(voter));
+      });
+      console.log(`  • ${voterSet.size} members have voted so far`);
+
+      // Check if there are any non-bot users in the channel who haven't voted
+      // We need to get user info for each member to check if they're a bot
+      let nonBotMembers: string[] = [];
+
+      for (const memberId of channelMembers) {
+        try {
+          // Skip checking app/bot users
+          if (memberId.startsWith("B") || memberId.startsWith("U")) {
+            const userInfo = await this.getClient().users.info({
+              user: memberId,
+            });
+            if (
+              userInfo.ok &&
+              userInfo.user &&
+              !userInfo.user.is_bot &&
+              !userInfo.user.is_app_user
+            ) {
+              nonBotMembers.push(memberId);
+            }
+          }
+        } catch (error) {
+          console.log(
+            `  • Error checking if user ${memberId} is a bot: ${error}`
+          );
+        }
+      }
+
+      console.log(`  • Channel has ${nonBotMembers.length} non-bot members`);
+
+      // Check if every non-bot member has voted
+      const allVoted = nonBotMembers.every((member) => voterSet.has(member));
+
+      if (allVoted && nonBotMembers.length > 0) {
+        console.log(
+          `  • All ${nonBotMembers.length} non-bot members have voted`
+        );
+        return true;
+      } else {
+        const nonVoters = nonBotMembers.filter(
+          (member) => !voterSet.has(member)
+        );
+        console.log(
+          `  • ${nonVoters.length} non-bot members haven't voted yet`
+        );
+        return false;
+      }
+    } catch (error) {
+      console.error(
+        `  • Error checking channel members voting status: ${error}`
+      );
+      return false;
     }
   }
 
