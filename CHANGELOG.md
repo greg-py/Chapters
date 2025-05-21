@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [3.2.0](https://github.com/greg-py/Chapters/compare/v3.1.8...v3.2.0) (2025-05-21)
+
+
+### Features
+
+* added a tie breaking mechanism for transitioning from voting phase ([477c296](https://github.com/greg-py/Chapters/commit/477c296735e48a8919c64238ec05ad7d7b97d071))
+* added automatic phase transition when all users have voted ([ad1c053](https://github.com/greg-py/Chapters/commit/ad1c053544f7400397b67b83da5a92e0453d89a0))
+
 ### [3.1.8](https://github.com/greg-py/Chapters/compare/v3.1.7...v3.1.8) (2025-05-20)
 
 
