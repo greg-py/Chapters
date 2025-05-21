@@ -245,8 +245,9 @@ export const sendVotingResultsUI = async (
     ...resultBlocks,
   ];
 
-  await client.chat.postMessage({
+  await client.chat.postEphemeral({
     channel: command.channel_id,
+    user: command.user_id,
     blocks,
     text: "Voting Results for Book Club Cycle",
   });
