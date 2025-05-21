@@ -698,14 +698,35 @@ export class PhaseTransitionService {
       return;
     }
 
-    const channelId = cycle.getChannelId();
-    let announcementMsg = `:rotating_light: *Automatic Book Club Phase Change*\n\nThe "${cycle.getName()}" book club cycle has moved to the *${capitalizeFirstLetter(
+    // Refresh cycle data to get the latest state after update
+    const db = await connectToDatabase();
+    const updatedCycleData = await getCycleById(db, cycle.getId());
+    let refreshedCycle = cycle;
+
+    if (updatedCycleData) {
+      refreshedCycle = new Cycle(
+        updatedCycleData._id,
+        updatedCycleData.channelId,
+        updatedCycleData.name,
+        updatedCycleData.startDate,
+        updatedCycleData.status,
+        updatedCycleData.phaseDurations,
+        updatedCycleData.currentPhase,
+        updatedCycleData.selectedBookId,
+        updatedCycleData.phaseTimings
+      );
+    }
+
+    const channelId = refreshedCycle.getChannelId();
+    let announcementMsg = `:rotating_light: *Automatic Book Club Phase Change*\n\nThe "${refreshedCycle.getName()}" book club cycle has moved to the *${capitalizeFirstLetter(
       nextPhase
     )} Phase*.`;
 
     // If transitioning to VOTING phase, include all suggested books
     if (nextPhase === CyclePhase.VOTING) {
-      const suggestions = await Suggestion.getAllForCycle(cycle.getId());
+      const suggestions = await Suggestion.getAllForCycle(
+        refreshedCycle.getId()
+      );
 
       if (suggestions.length > 0) {
         announcementMsg += `\n\n:ballot_box_with_ballot: *Books Available for Voting:*\n`;
@@ -725,21 +746,26 @@ export class PhaseTransitionService {
 
     // If transitioning to READING phase, show the winning book with nice formatting
     if (nextPhase === CyclePhase.READING) {
-      // First, make sure we have a selected book
-      let selectedBookId = cycle.getSelectedBookId();
+      // Get the selected book ID from the refreshed cycle data
+      let selectedBookId = refreshedCycle.getSelectedBookId();
 
-      // If no book is selected yet, try to auto-select a winner
+      // Only try to auto-select if we still don't have a book ID after refreshing
       if (!selectedBookId) {
-        const success = await this.autoSelectWinner(cycle);
+        console.log(
+          "  • No book selected after refresh, attempting to auto-select..."
+        );
+        const success = await this.autoSelectWinner(refreshedCycle);
         if (success) {
           // Get the updated cycle with the newly selected book using the DTO function
-          const db = await connectToDatabase();
-          const updatedCycleData = await getCycleById(db, cycle.getId());
-
-          if (updatedCycleData && updatedCycleData.selectedBookId) {
-            selectedBookId = updatedCycleData.selectedBookId;
+          const updatedData = await getCycleById(db, refreshedCycle.getId());
+          if (updatedData && updatedData.selectedBookId) {
+            selectedBookId = updatedData.selectedBookId;
           }
         }
+      } else {
+        console.log(
+          `  • Book already selected (ID: ${selectedBookId}), using existing selection`
+        );
       }
 
       // Now process the message with the book info if we have it
