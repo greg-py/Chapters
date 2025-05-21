@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [3.2.1](https://github.com/greg-py/Chapters/compare/v3.2.0...v3.2.1) (2025-05-21)
+
+
+### Bug Fixes
+
+* resolved issue with error message in voting phase automatic phase transition ([bc83e4e](https://github.com/greg-py/Chapters/commit/bc83e4e97325f8047910d9f89c5a97f79632e34a))
+
+
+### Chores
+
+* added unit tests for utils files ([53b8d0a](https://github.com/greg-py/Chapters/commit/53b8d0a24c5132ebe4f17e88e5efe87b239249c8))
+
 ## [3.2.0](https://github.com/greg-py/Chapters/compare/v3.1.8...v3.2.0) (2025-05-21)
 
 
