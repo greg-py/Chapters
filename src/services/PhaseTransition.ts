@@ -1,16 +1,10 @@
 import { App } from "@slack/bolt";
 import { Cycle, Suggestion } from "./";
 import { CyclePhase } from "../constants";
-import { capitalizeFirstLetter } from "../utils";
-import { ObjectId } from "mongodb";
+import { capitalizeFirstLetter, resolveTiesAndSelectWinner } from "../utils";
 import { connectToDatabase } from "../db";
 import { WebClient } from "@slack/web-api";
 import { getAllActiveCycles, getCycleById } from "../dto";
-
-interface VoteTally {
-  suggestionId: ObjectId;
-  totalPoints: number;
-}
 
 /**
  * Service to manage automatic phase transitions based on configured durations
@@ -521,29 +515,18 @@ export class PhaseTransitionService {
         return false;
       }
 
-      // Tally the votes
-      const voteTallies = this.tallyVotesForCycle(suggestions);
-      console.log(`    • Vote tally results: ${JSON.stringify(voteTallies)}`);
-
-      if (voteTallies.length === 0) {
-        console.log(`    • ❌ No tallied votes available`);
-        return false;
-      }
-
-      // Find the winner (first place in ranked choice voting)
-      const winningBookId = voteTallies[0].suggestionId;
-      console.log(`    • Winning book ID: ${winningBookId}`);
-
-      const winnerSuggestion = suggestions.find((s) =>
-        s.getId().equals(winningBookId)
+      // Use the utility function to resolve ties and select a winner
+      const winnerSuggestion = resolveTiesAndSelectWinner(
+        suggestions,
+        "    • "
       );
 
       if (!winnerSuggestion) {
-        console.log(
-          `    • ❌ Could not find winning suggestion in suggestions list`
-        );
+        console.log(`    • ❌ Could not select a winner`);
         return false;
       }
+
+      const winningBookId = winnerSuggestion.getId();
 
       console.log(
         `    • Selected winner: "${winnerSuggestion.getBookName()}" by ${winnerSuggestion.getAuthor()}`
@@ -822,20 +805,5 @@ export class PhaseTransitionService {
     });
 
     console.log(`Cycle ${cycle.getId()} completed and archived`);
-  }
-
-  /**
-   * Tally votes for a cycle
-   */
-  private tallyVotesForCycle(suggestions: Suggestion[]): VoteTally[] {
-    // Sort suggestions by their total points in descending order
-    const tallies = suggestions
-      .map((suggestion) => ({
-        suggestionId: suggestion.getId(),
-        totalPoints: suggestion.getTotalPoints() || 0,
-      }))
-      .sort((a, b) => b.totalPoints - a.totalPoints);
-
-    return tallies;
   }
 }
