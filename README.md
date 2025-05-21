@@ -215,6 +215,14 @@ Displays all books that have been suggested for the current reading cycle, inclu
 **Usage Hint:** `/chapters-vote`  
 Opens a voting UI where members can select their first, second, and third choices among the suggested books. Each vote allocates points in a ranked choice system (3 points for first choice, 2 for second, 1 for third).
 
+#### Tie-Breaking Mechanism
+
+When multiple books receive the same number of points, the system uses a multi-step tie-breaking process:
+
+1. First, it compares the total points received by each book
+2. If points are equal, it breaks the tie by counting the number of unique voters for each book
+3. If both points and number of voters are equal, a random selection is made to ensure fairness
+
 ### `/chapters-voting-results`
 
 **Short Description:** View current voting results  

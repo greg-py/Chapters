@@ -1,6 +1,10 @@
 import type { App, BlockAction } from "@slack/bolt";
 import { Suggestion, Vote } from "../../services";
-import { capitalizeFirstLetter, withActionErrorHandling } from "../../utils";
+import {
+  capitalizeFirstLetter,
+  withActionErrorHandling,
+  resolveTiesAndSelectWinner,
+} from "../../utils";
 import { ActionId, BlockId, CyclePhase } from "../../constants";
 import { validateActiveCycleExists } from "../../validators";
 import { ObjectId } from "mongodb";
@@ -295,10 +299,16 @@ export const registerCycleActions = (app: App): void => {
             return;
           }
 
-          // Sort suggestions by votes to get the winner
-          const winner = [...suggestions].sort(
-            (a, b) => b.getTotalPoints() - a.getTotalPoints()
-          )[0];
+          // Use the utility function to select a winner with tie-breaking
+          const winner = resolveTiesAndSelectWinner(suggestions);
+
+          if (!winner) {
+            await respond({
+              text: `⚠️ Unable to determine a winner. Please check the voting results and try again.`,
+              replace_original: true,
+            });
+            return;
+          }
 
           // Confirm with the user that we'll select this book
           // This posts a NEW ephemeral message with its own buttons.
