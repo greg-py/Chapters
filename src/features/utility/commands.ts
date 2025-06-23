@@ -9,18 +9,24 @@ export function registerUtilityCommands(app: App): void {
   // Simple ping command for testing
   app.command(
     "/chapters-ping",
-    withErrorHandling(async ({ say }) => {
-      await say("Pong! Chapters is up and running!");
+    withErrorHandling(async ({ command, client }) => {
+      await client.chat.postEphemeral({
+        channel: command.channel_id,
+        user: command.user_id,
+        text: "Pong! Chapters is up and running!",
+      });
     })
   );
 
   // Version command
   app.command(
     "/chapters-version",
-    withErrorHandling(async ({ say }) => {
+    withErrorHandling(async ({ command, client }) => {
       const version =
         process.env.APP_VERSION || require("../../../package.json").version;
-      await say({
+      await client.chat.postEphemeral({
+        channel: command.channel_id,
+        user: command.user_id,
         text: `Chapters Version: ${version}`,
         blocks: [
           {
@@ -38,8 +44,10 @@ export function registerUtilityCommands(app: App): void {
   // Help command
   app.command(
     "/chapters-help",
-    withErrorHandling(async ({ say }) => {
-      await say({
+    withErrorHandling(async ({ command, client }) => {
+      await client.chat.postEphemeral({
+        channel: command.channel_id,
+        user: command.user_id,
         text: "Chapters Help",
         blocks: [
           {
@@ -53,7 +61,7 @@ export function registerUtilityCommands(app: App): void {
             type: "section",
             text: {
               type: "mrkdwn",
-              text: "• `/chapters-ping` - Check if the bot is running\n• `/chapters-help` - Show this help message\n• `/chapters-version` - Show current version\n• `/chapters-start-cycle` - Start a new book club cycle\n• `/chapters-cycle-status` - Check current cycle information\n• `/chapters-set-phase` - Manually change book club phase\n• `/chapters-suggest-book` - Open UI to suggest a book\n• `/chapters-view-suggestions` - View all book suggestions\n• `/chapters-vote` - Vote for your favorite books\n• `/chapters-voting-results` - View current voting results\n• `/chapters-complete-cycle` - Complete and archive the current cycle\n• `/chapters-reset-cycle` - Reset and delete the current cycle (emergency)",
+              text: "• `/chapters-ping` - Check if the bot is running\n• `/chapters-help` - Show this help message\n• `/chapters-version` - Show current version\n• `/chapters-start-cycle` - Start a new book club cycle\n• `/chapters-cycle-status` - Check current cycle information\n• `/chapters-set-phase` - Manually change book club phase\n• `/chapters-suggest-book` - Open UI to suggest a book\n• `/chapters-view-suggestions` - View all book suggestions\n• `/chapters-vote` - Vote for your favorite books\n• `/chapters-voting-results` - View current voting results\n• `/chapters-rate-book` - Rate the selected book (discussion phase)\n• `/chapters-rating-results` - View book rating results (discussion phase)\n• `/chapters-complete-cycle` - Complete and archive the current cycle\n• `/chapters-reset-cycle` - Reset and delete the current cycle (emergency)",
             },
           },
         ],

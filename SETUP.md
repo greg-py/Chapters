@@ -75,7 +75,11 @@ Ensure your Slack app has the following:
    - `/chapters-view-suggestions` - View all book suggestions
    - `/chapters-vote` - Vote for your favorite books
    - `/chapters-voting-results` - View current voting results
+   - `/chapters-rate-book` - Rate the selected book (1-10 scale)
+   - `/chapters-rating-results` - View book rating results and stats
    - `/chapters-complete-cycle` - Complete and archive the current cycle
+   - `/chapters-version` - Show current bot version
+   - `/chapters-reset-cycle` - Reset and delete the current cycle
 
 ### Running the Bot
 

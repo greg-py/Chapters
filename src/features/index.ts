@@ -3,6 +3,7 @@ import { registerCycleFeature } from "./cycle";
 import { registerSuggestionFeature } from "./suggestion";
 import { registerVoteFeature } from "./vote";
 import { registerUtilityFeature } from "./utility";
+import { registerDiscussionFeature } from "./discussion";
 
 /**
  * Registers all features (commands and actions)
@@ -13,4 +14,5 @@ export function registerFeatures(app: App): void {
   registerCycleFeature(app);
   registerSuggestionFeature(app);
   registerVoteFeature(app);
+  registerDiscussionFeature(app);
 }

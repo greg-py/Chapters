@@ -75,14 +75,21 @@ export const updateCycle = async (db: Db, cycle: Partial<TCycle>) => {
     updateOperation.$unset = { selectedBookId: 1 };
   }
 
-  const response = await db.collection(COLLECTIONS.CYCLES).updateOne(
-    {
-      _id: cycle._id,
-      channelId: cycle.channelId,
-      status: "active",
-    },
-    updateOperation
-  );
+  // Create the filter - only require active status if we're not updating the status itself
+  // This allows us to update completed cycles for things like setting phase end dates
+  const filter: { _id: ObjectId; channelId: string; status?: string } = {
+    _id: cycle._id!,
+    channelId: cycle.channelId!,
+  };
+
+  // Only require active status if we're not changing the status
+  if (!cycle.status) {
+    filter.status = "active";
+  }
+
+  const response = await db
+    .collection(COLLECTIONS.CYCLES)
+    .updateOne(filter, updateOperation);
   return response.modifiedCount;
 };
 

@@ -3,7 +3,9 @@ import { withErrorHandling } from "../../utils";
 import {
   validateVotingPrerequisites,
   validateActiveCycleExists,
+  validateCyclePhase,
 } from "../../validators";
+import { CyclePhase } from "../../constants";
 import { Suggestion } from "../../services";
 import { sendVoteUI, sendVotingResultsUI } from "./ui";
 
@@ -36,8 +38,13 @@ export const registerVoteCommands = (app: App): void => {
     withErrorHandling(async ({ command, client }) => {
       // Validate cycle exists
       const cycle = await validateActiveCycleExists(command.channel_id);
-      // No specific phase required to view results, but might want to check if voting/reading/discussion phase?
-      // validateCyclePhase(cycle, [CyclePhase.VOTING, CyclePhase.READING, CyclePhase.DISCUSSION], 'results viewing'); // Optional enhancement
+
+      // Validate that the cycle is in a phase where voting results are meaningful
+      validateCyclePhase(
+        cycle,
+        [CyclePhase.VOTING, CyclePhase.READING, CyclePhase.DISCUSSION],
+        "results viewing"
+      );
 
       const suggestions = await Suggestion.getAllForCycle(cycle.getId());
 

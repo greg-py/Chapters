@@ -935,10 +935,16 @@ export class PhaseTransitionService {
       return;
     }
 
+    // Import the completion message formatter
+    const { formatCycleCompletionMessage } = await import("../utils");
+
+    // Generate comprehensive completion message
+    const completionMessage = await formatCycleCompletionMessage(cycle);
+
     const channelId = cycle.getChannelId();
     await this.getClient().chat.postMessage({
       channel: channelId,
-      text: `:tada: *Book Club Cycle Completed!*\n\nThe book club cycle "${cycle.getName()}" has been completed and archived.\n\nTo start a new book club cycle, use the \`/chapters-start-cycle\` command.`,
+      text: completionMessage,
     });
 
     console.log(`Cycle ${cycle.getId()} completed and archived`);

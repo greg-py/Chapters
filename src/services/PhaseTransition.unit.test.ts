@@ -32,7 +32,7 @@ vi.mock("@slack/web-api", () => ({
 }));
 
 // Import after mocking to avoid circular dependencies
-import { Cycle, Suggestion } from "./";
+import { Cycle, Suggestion, Rating } from "./";
 import * as dtoModule from "../dto";
 import { WebClient } from "@slack/web-api";
 
@@ -71,13 +71,16 @@ const createMockSuggestion = (overrides = {}) => {
   return { ...baseMock, ...overrides } as unknown as Suggestion;
 };
 
-// Mock Cycle and Suggestion without circular import
+// Mock Cycle, Suggestion, and Rating without circular import
 vi.mock("./", () => {
   return {
     Cycle: vi.fn(() => createMockCycle()),
     Suggestion: {
       getAllForCycle: vi.fn(),
       getById: vi.fn(),
+    },
+    Rating: {
+      getStatsForCycle: vi.fn(),
     },
   };
 });
@@ -591,6 +594,21 @@ describe("PhaseTransitionService", () => {
         mockCycleData,
       ]);
 
+      // Mock the services used by formatCycleCompletionMessage
+      vi.mocked(Suggestion.getAllForCycle).mockResolvedValue([]);
+      vi.mocked(Rating.getStatsForCycle).mockResolvedValue({
+        averageRating: 0,
+        recommendationPercentage: 0,
+        totalRatings: 0,
+      });
+
+      // Mock the utils module to avoid dynamic import issues
+      vi.doMock("../utils", () => ({
+        formatCycleCompletionMessage: vi
+          .fn()
+          .mockResolvedValue("Book Club Cycle Completed! Test message"),
+      }));
+
       // Create a proper mock cycle
       const mockCycle = createMockCycle({
         getId: vi.fn().mockReturnValue(cycleId),
@@ -598,6 +616,8 @@ describe("PhaseTransitionService", () => {
         getName: vi.fn().mockReturnValue("Test Cycle"),
         getCurrentPhase: vi.fn().mockReturnValue(CyclePhase.DISCUSSION),
         getCurrentPhaseStartDate: vi.fn().mockReturnValue(discussionStartDate),
+        getSelectedBookId: vi.fn().mockReturnValue(undefined),
+        getStartDate: vi.fn().mockReturnValue(new Date()),
         getPhaseDurations: vi.fn().mockReturnValue({
           suggestion: 7,
           voting: 7,
@@ -611,6 +631,10 @@ describe("PhaseTransitionService", () => {
           discussion: {
             startDate: discussionStartDate,
           },
+        }),
+        getStats: vi.fn().mockResolvedValue({
+          totalSuggestions: 0,
+          totalVotes: 0,
         }),
       });
 

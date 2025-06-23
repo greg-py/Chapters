@@ -71,11 +71,11 @@ export function registerCycleCommands(app: App): void {
         return;
       }
 
-      // Update the cycle status using the update method
-      await cycle.update({ status: "completed" });
-
-      // Set the end date for the discussion phase
+      // Set the end date for the discussion phase first (while still active)
       await cycle.setCurrentPhaseEndDate();
+
+      // Then update the cycle status to completed
+      await cycle.update({ status: "completed" });
 
       // Send confirmation to the user
       await client.chat.postEphemeral({
@@ -84,10 +84,16 @@ export function registerCycleCommands(app: App): void {
         text: `✅ Book club cycle "${cycle.getName()}" has been completed and archived.`,
       });
 
-      // Post announcement in the channel
+      // Import the completion message formatter
+      const { formatCycleCompletionMessage } = await import("../../utils");
+
+      // Generate comprehensive completion message
+      const completionMessage = await formatCycleCompletionMessage(cycle);
+
+      // Post comprehensive announcement in the channel
       await client.chat.postMessage({
         channel: command.channel_id,
-        text: `:tada: *Book Club Cycle Completed!*\n\nThe book club cycle "${cycle.getName()}" has been completed and archived.\n\nTo start a new book club cycle, use the \`/chapters-start-cycle\` command.`,
+        text: completionMessage,
       });
     })
   );
