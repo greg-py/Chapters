@@ -6,4 +6,5 @@ export const COLLECTIONS = {
   CYCLES: "cycles",
   SUGGESTIONS: "suggestions",
   VOTES: "votes",
+  RATINGS: "ratings",
 };

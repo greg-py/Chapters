@@ -12,6 +12,7 @@ import { connectToDatabase } from "../../db";
 import {
   deleteVotesByCycle,
   deleteSuggestionsByCycle,
+  deleteRatingsByCycle,
   deleteCycleById,
 } from "../../dto";
 import { TPhaseTimings } from "../../models/cycle.schema";
@@ -597,6 +598,9 @@ export const registerCycleActions = (app: App): void => {
 
         // Delete any votes for this cycle
         await deleteVotesByCycle(db, cycleId);
+
+        // Delete any ratings for this cycle
+        await deleteRatingsByCycle(db, cycleId);
 
         // Delete the cycle itself
         await deleteCycleById(db, cycleId);

@@ -8,6 +8,7 @@ Chapters is a comprehensive Slack bot designed to streamline book club managemen
 - **Configurable Phases**: Customize the duration of each book club phase (suggestion, voting, reading, discussion)
 - **Book Suggestions**: Members can suggest books with details like author, URL, and notes
 - **Ranked Choice Voting**: Vote for preferred books using a ranked choice system
+- **Book Rating System**: Rate books during the discussion phase with 1-10 ratings and recommendation tracking
 - **Book Club Status**: Check the current status and phase of the book club
 - **Cycle History**: View past book club cycles with statistics and winning books
 - **Anonymous Suggestions**: Book suggestions are displayed anonymously to prevent bias in voting
@@ -161,6 +162,8 @@ Here's a complete list of all available commands:
 | `/chapters-view-suggestions` | View all book suggestions              | `/chapters-view-suggestions` |
 | `/chapters-vote`             | Vote for your favorite books           | `/chapters-vote`             |
 | `/chapters-voting-results`   | View current voting results            | `/chapters-voting-results`   |
+| `/chapters-rate-book`        | Rate the selected book (1-10 scale)    | `/chapters-rate-book`        |
+| `/chapters-rating-results`   | View book rating results and stats     | `/chapters-rating-results`   |
 | `/chapters-complete-cycle`   | Complete and archive the current cycle | `/chapters-complete-cycle`   |
 | `/chapters-version`          | Show current bot version               | `/chapters-version`          |
 | `/chapters-reset-cycle`      | Reset and delete the current cycle     | `/chapters-reset-cycle`      |
@@ -229,6 +232,18 @@ When multiple books receive the same number of points, the system uses a multi-s
 **Usage Hint:** `/chapters-voting-results`  
 Shows the current standings in the voting process, with suggestions sorted by total points received. Displays medal emojis (🥇, 🥈, 🥉) for the top three books.
 
+### `/chapters-rate-book`
+
+**Short Description:** Rate the selected book (1-10 scale)  
+**Usage Hint:** `/chapters-rate-book`  
+Opens a rating UI where members can rate the selected book during the discussion phase. Members can provide a rating from 1-10 and indicate whether they would recommend the book to others. Each member can only rate once per cycle, and ratings are used to generate statistics for the book club.
+
+### `/chapters-rating-results`
+
+**Short Description:** View book rating results and stats  
+**Usage Hint:** `/chapters-rating-results`  
+Displays comprehensive rating statistics for the selected book, including the average rating (displayed with star emojis), total number of ratings, and the percentage of members who would recommend the book. This command is only available during the discussion phase and provides valuable insights into how the book club members felt about the selected book.
+
 ### `/chapters-complete-cycle`
 
 **Short Description:** Complete and archive the current cycle  
@@ -249,6 +264,7 @@ Emergency command that allows administrators to reset and delete the current boo
 
 - Delete all book suggestions
 - Delete all votes
+- Delete all book ratings
 - Clear phase transition timers
 - Allow starting a fresh cycle
 
@@ -263,9 +279,10 @@ Emergency command that allows administrators to reset and delete the current boo
 5. **Voting Phase**: Members vote on their favorite books using `/chapters-vote`
 6. **View Results**: Check voting results with `/chapters-voting-results`
 7. **Reading Phase**: Read the winning book selection
-8. **Discussion Phase**: Discuss the book with the group
-9. **Complete Cycle**: End the cycle with `/chapters-complete-cycle`
-10. **Check Status**: Monitor the current phase and deadlines with `/chapters-cycle-status`
+8. **Discussion Phase**: Discuss the book with the group and rate it using `/chapters-rate-book`
+9. **View Ratings**: Check book ratings and statistics with `/chapters-rating-results`
+10. **Complete Cycle**: End the cycle with `/chapters-complete-cycle`
+11. **Check Status**: Monitor the current phase and deadlines with `/chapters-cycle-status`
 
 ## Phase Transition Messages
 

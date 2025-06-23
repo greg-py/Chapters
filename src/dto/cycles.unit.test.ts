@@ -202,7 +202,6 @@ describe("Cycles DTO", () => {
         {
           _id: cycleId,
           channelId: "channel-123",
-          status: "active",
         },
         {
           $set: cycleData,
@@ -236,11 +235,43 @@ describe("Cycles DTO", () => {
         {
           _id: cycleId,
           channelId: "channel-123",
-          status: "active",
         },
         {
           $set: { _id: cycleId, channelId: "channel-123", status: "active" },
           $unset: { selectedBookId: 1 },
+        }
+      );
+      expect(result).toBe(1);
+    });
+
+    it("should include status filter when not updating status", async () => {
+      // Setup
+      const cycleId = new ObjectId();
+      const cycleData = {
+        _id: cycleId,
+        channelId: "channel-123",
+        name: "Updated Name",
+      };
+
+      const mockCollection = {
+        updateOne: vi.fn().mockResolvedValue({ modifiedCount: 1 }),
+      };
+
+      mockDb.collection.mockReturnValue(mockCollection);
+
+      // Execute
+      const result = await updateCycle(mockDb as any, cycleData as any);
+
+      // Assert
+      expect(mockDb.collection).toHaveBeenCalledWith(COLLECTIONS.CYCLES);
+      expect(mockCollection.updateOne).toHaveBeenCalledWith(
+        {
+          _id: cycleId,
+          channelId: "channel-123",
+          status: "active",
+        },
+        {
+          $set: cycleData,
         }
       );
       expect(result).toBe(1);

@@ -27,6 +27,12 @@ export const ActionId = {
   SUBMIT_VOTE: "submit_vote",
   CANCEL_VOTE: "cancel_vote",
 
+  // Rating Actions
+  RATING_SELECT: "rating_select",
+  RECOMMEND_SELECT: "recommend_select",
+  SUBMIT_RATING: "submit_rating",
+  CANCEL_RATING: "cancel_rating",
+
   // Input Action IDs (often nested within block IDs)
   CYCLE_NAME_INPUT: "cycle_name_input",
   SUGGESTION_DAYS_INPUT: "suggestion_days_input",
@@ -63,6 +69,10 @@ export const BlockId = {
   FIRST_CHOICE: "first_choice",
   SECOND_CHOICE: "second_choice",
   THIRD_CHOICE: "third_choice",
+
+  // Rating UI
+  BOOK_RATING: "book_rating",
+  BOOK_RECOMMEND: "book_recommend",
 };
 
 /**
