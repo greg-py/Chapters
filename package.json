@@ -1,6 +1,6 @@
 {
   "name": "chapters-slack-bot",
-  "version": "3.2.1",
+  "version": "3.3.0",
   "description": "A Slack bot named Chapters designed to simplify book club management with automated suggestions, voting, and reading reminders.",
   "main": "dist/index.js",
   "scripts": {

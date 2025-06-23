@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [3.3.0](https://github.com/greg-py/Chapters/compare/v3.2.1...v3.3.0) (2025-06-23)
+
+
+### Features
+
+* added new book rating system and enhanced with completion message ([c6bcf58](https://github.com/greg-py/Chapters/commit/c6bcf5888752cf65f9264402feea5834abf05542))
+
 ### [3.2.1](https://github.com/greg-py/Chapters/compare/v3.2.0...v3.2.1) (2025-05-21)
 
 
